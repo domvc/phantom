@@ -10,11 +10,35 @@ export type IntervalsConnection = {
   connectedAt: string;
 };
 
+export type RaceType =
+  | "5K"
+  | "10K"
+  | "HM"
+  | "Marathon"
+  | "Ultra"
+  | "Olympic Tri"
+  | "Half Ironman"
+  | "Ironman"
+  | "Other";
+
 export type RaceGoal = {
   name: string;
-  type: "5K" | "10K" | "HM" | "Marathon" | "Olympic Tri" | "Half Ironman" | "Ironman" | "Other";
+  type: RaceType;
   date: string;
   targetTime: string;
+  /** Free-text race format detail — used for ultras (distance/duration), backyard formats, multi-day events. */
+  raceDetails?: string;
+  notes?: string;
+};
+
+export type SportPref = "run" | "bike" | "swim" | "strength" | "mobility";
+
+export type TrainingPrefs = {
+  sports: SportPref[];
+  hasBike?: boolean;
+  hasGym?: boolean;
+  hasPool?: boolean;
+  conditioningEmphasis?: "minimal" | "moderate" | "high";
   notes?: string;
 };
 
@@ -147,6 +171,7 @@ export type BodyMeasurement = {
 export type UserState = {
   intervals?: IntervalsConnection;
   raceGoal?: RaceGoal;
+  trainingPrefs?: TrainingPrefs;
   athleteNotes?: AthleteNotes;
   onboardingComplete?: boolean;
   synced?: SyncedData;
@@ -161,7 +186,7 @@ export type UserState = {
   briefVersion?: number;
 };
 
-const CURRENT_BRIEF_VERSION = 3;
+const CURRENT_BRIEF_VERSION = 4;
 
 const KEY = "phantomcoach:user";
 

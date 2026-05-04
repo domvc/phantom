@@ -11,6 +11,8 @@ import {
   type RaceGoal,
   type AthleteNotes,
   type Plan,
+  type TrainingPrefs,
+  type SportPref,
 } from "@/lib/storage";
 import {
   PhantomLogo,
@@ -79,8 +81,8 @@ export default function OnboardingPage() {
 
           {step === "race" && (
             <RaceStep
-              onNext={(goal) => {
-                setUserState({ raceGoal: goal });
+              onNext={(goal, prefs) => {
+                setUserState({ raceGoal: goal, trainingPrefs: prefs });
                 setStep("goals");
               }}
               onBack={() => setStep("intervals")}
@@ -437,7 +439,7 @@ function RaceStep({
   onNext,
   onBack,
 }: {
-  onNext: (g: RaceGoal) => void;
+  onNext: (g: RaceGoal, prefs: TrainingPrefs) => void;
   onBack: () => void;
 }) {
   const [goal, setGoal] = useState<RaceGoal>({
@@ -445,12 +447,23 @@ function RaceStep({
     type: "Half Ironman",
     date: "",
     targetTime: "",
+    raceDetails: "",
+    notes: "",
+  });
+
+  const [prefs, setPrefs] = useState<TrainingPrefs>({
+    sports: ["run", "bike", "swim", "strength"],
+    hasBike: true,
+    hasGym: true,
+    hasPool: true,
+    conditioningEmphasis: "moderate",
     notes: "",
   });
 
   useEffect(() => {
     const s = getUserState();
     if (s.raceGoal) setGoal(s.raceGoal);
+    if (s.trainingPrefs) setPrefs(s.trainingPrefs);
   }, []);
 
   const types: RaceGoal["type"][] = [
@@ -458,13 +471,58 @@ function RaceStep({
     "10K",
     "HM",
     "Marathon",
+    "Ultra",
     "Olympic Tri",
     "Half Ironman",
     "Ironman",
     "Other",
   ];
 
-  const canSubmit = !!(goal.name && goal.date);
+  const showRaceDetails = goal.type === "Ultra" || goal.type === "Other";
+
+  // Suggest sport defaults when race type changes
+  useEffect(() => {
+    const triTypes: RaceGoal["type"][] = ["Olympic Tri", "Half Ironman", "Ironman"];
+    const runTypes: RaceGoal["type"][] = ["5K", "10K", "HM", "Marathon", "Ultra"];
+    if (triTypes.includes(goal.type)) {
+      setPrefs((p) =>
+        p.sports.length === 4 && p.sports.includes("run") && p.sports.includes("bike")
+          ? p
+          : { ...p, sports: ["run", "bike", "swim", "strength"] }
+      );
+    } else if (runTypes.includes(goal.type)) {
+      setPrefs((p) =>
+        p.sports.length === 2 && p.sports.includes("run") && p.sports.includes("strength")
+          ? p
+          : { ...p, sports: ["run", "strength"] }
+      );
+    }
+    // 'Other' — leave whatever the athlete had
+  }, [goal.type]);
+
+  const sportOptions: { id: SportPref; label: string }[] = [
+    { id: "run", label: "Run" },
+    { id: "bike", label: "Bike" },
+    { id: "swim", label: "Swim" },
+    { id: "strength", label: "Strength" },
+    { id: "mobility", label: "Mobility" },
+  ];
+
+  function toggleSport(s: SportPref) {
+    setPrefs((p) => ({
+      ...p,
+      sports: p.sports.includes(s) ? p.sports.filter((x) => x !== s) : [...p.sports, s],
+    }));
+  }
+
+  const ultraDetailsRequired = goal.type === "Ultra" && !goal.raceDetails?.trim();
+  const canSubmit = !!(goal.name && goal.date) && !ultraDetailsRequired && prefs.sports.length > 0;
+
+  const conditioningOptions: { id: NonNullable<TrainingPrefs["conditioningEmphasis"]>; label: string }[] = [
+    { id: "minimal", label: "Minimal" },
+    { id: "moderate", label: "Moderate" },
+    { id: "high", label: "High" },
+  ];
 
   return (
     <div>
@@ -476,7 +534,7 @@ function RaceStep({
       />
 
       <div className="space-y-5">
-        <Field label="Race name" hint="e.g. Outlaw Half, Klagenfurt 70.3">
+        <Field label="Race name" hint="e.g. Outlaw Half, Suffolk Backyard, UTMB CCC">
           <input
             type="text"
             value={goal.name}
@@ -487,7 +545,7 @@ function RaceStep({
         </Field>
 
         <Field label="Race type">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {types.map((t) => (
               <button
                 key={t}
@@ -504,6 +562,29 @@ function RaceStep({
             ))}
           </div>
         </Field>
+
+        {showRaceDetails && (
+          <Field
+            label={goal.type === "Ultra" ? "Ultra format & distance" : "Race details"}
+            hint={
+              goal.type === "Ultra"
+                ? "Backyard (4.167mi/hr last-person-standing), 50K, 50mi, 100K, 100mi, multi-day, etc."
+                : "Distance, format, terrain — anything that shapes the plan."
+            }
+          >
+            <textarea
+              value={goal.raceDetails || ""}
+              onChange={(e) => setGoal({ ...goal, raceDetails: e.target.value })}
+              placeholder={
+                goal.type === "Ultra"
+                  ? "e.g. Backyard ultra — 6.7km loops every hour, target 24+ loops"
+                  : "e.g. SwimRun, hyrox, 200km gravel event"
+              }
+              rows={3}
+              className="w-full px-3 py-2.5 bg-bg border border-border rounded-md text-[13px] focus:outline-none focus:border-accent transition resize-none"
+            />
+          </Field>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Race date">
@@ -525,8 +606,112 @@ function RaceStep({
           </Field>
         </div>
 
+        <div className="border-t border-border-soft pt-5 mt-2">
+          <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold text-text-muted mb-3">
+            Training preferences
+          </div>
+
+          <Field label="Sports to include" hint="Tap to toggle. The plan only uses what you select.">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {sportOptions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => toggleSport(s.id)}
+                  className={`px-2 py-2 text-[11.5px] font-semibold rounded-md border transition ${
+                    prefs.sports.includes(s.id)
+                      ? "bg-accent text-white border-accent"
+                      : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {prefs.sports.includes("bike") && (
+            <Field label="Bike access">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPrefs({ ...prefs, hasBike: true })}
+                  className={`px-3 py-2 text-[12px] font-semibold rounded-md border transition ${
+                    prefs.hasBike
+                      ? "bg-accent text-white border-accent"
+                      : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  I have a bike
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrefs({ ...prefs, hasBike: false })}
+                  className={`px-3 py-2 text-[12px] font-semibold rounded-md border transition ${
+                    !prefs.hasBike
+                      ? "bg-accent text-white border-accent"
+                      : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  Indoor / spin only
+                </button>
+              </div>
+            </Field>
+          )}
+
+          {prefs.sports.includes("swim") && (
+            <Field label="Pool access">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPrefs({ ...prefs, hasPool: true })}
+                  className={`px-3 py-2 text-[12px] font-semibold rounded-md border transition ${
+                    prefs.hasPool
+                      ? "bg-accent text-white border-accent"
+                      : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  Regular pool access
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrefs({ ...prefs, hasPool: false })}
+                  className={`px-3 py-2 text-[12px] font-semibold rounded-md border transition ${
+                    !prefs.hasPool
+                      ? "bg-accent text-white border-accent"
+                      : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  Limited / open water only
+                </button>
+              </div>
+            </Field>
+          )}
+
+          {prefs.sports.includes("strength") && (
+            <Field label="Conditioning emphasis" hint="How much gym work do you want?">
+              <div className="grid grid-cols-3 gap-2">
+                {conditioningOptions.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setPrefs({ ...prefs, conditioningEmphasis: c.id })}
+                    className={`px-2 py-2 text-[12px] font-semibold rounded-md border transition ${
+                      prefs.conditioningEmphasis === c.id
+                        ? "bg-accent text-white border-accent"
+                        : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
+        </div>
+
         <button
-          onClick={() => onNext(goal)}
+          onClick={() => onNext(goal, prefs)}
           disabled={!canSubmit}
           className="w-full px-5 py-3 bg-accent hover:bg-accent-h disabled:opacity-40 disabled:cursor-not-allowed text-white text-[13px] font-semibold rounded-md transition"
         >
@@ -1048,6 +1233,7 @@ function PlanStep({
         body: JSON.stringify({
           synced: s.synced,
           raceGoal: s.raceGoal,
+          trainingPrefs: s.trainingPrefs,
           athleteNotes: s.athleteNotes,
           amendments: s.amendments,
           sessionFeedbacks: s.sessionFeedbacks,

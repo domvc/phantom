@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
   }
 
   const reqBody = await req.json().catch(() => ({}));
-  const { synced, raceGoal, athleteNotes, amendments, sessionFeedbacks } = reqBody;
+  const { synced, raceGoal, trainingPrefs, athleteNotes, amendments, sessionFeedbacks } = reqBody;
 
   if (!raceGoal?.date) {
     return NextResponse.json({ ok: false, error: "No race goal set" }, { status: 400 });
@@ -110,6 +110,31 @@ WEEKS TO RACE: ${totalWeeks}
 
 RACE GOAL:
 ${JSON.stringify(raceGoal, null, 2)}
+${
+  raceGoal.type === "Ultra"
+    ? `
+ULTRA-SPECIFIC GUIDANCE:
+- Ultras are NOT marathons stretched out. Time-on-feet beats top-end intensity.
+- Backyard formats (loops every hour, last person standing) demand pacing discipline, fuelling rhythm, mental rehearsal of the loop format. Long sessions should simulate cumulative time-on-feet across consecutive days, not single mega-runs.
+- Distance ultras (50K-100mi) need progressive long runs, back-to-back weekends, hike-walk-run pacing, and night-running rehearsal where applicable.
+- Read the raceDetails field above carefully — it tells you the format. Build the plan around it, not around generic ultra advice.
+- Strength/mobility is non-negotiable for ultras: posterior chain, hip stability, foot strength.`
+    : ""
+}
+
+TRAINING PREFERENCES (the athlete chose these — RESPECT THEM):
+${
+  trainingPrefs
+    ? `Sports to include: ${(trainingPrefs.sports || []).join(", ") || "(none specified)"}
+Bike access: ${trainingPrefs.hasBike === false ? "INDOOR/SPIN ONLY — no outdoor rides" : "Has a bike"}
+Pool access: ${trainingPrefs.hasPool === false ? "LIMITED — favour open water or skip pool work" : "Regular pool"}
+Conditioning emphasis: ${trainingPrefs.conditioningEmphasis || "moderate"}
+Notes: ${trainingPrefs.notes || "(none)"}
+
+HARD RULE: Only emit sessions whose sport is in the "Sports to include" list. If "swim" isn't included, the weekly_template must contain ZERO swim sessions. If "bike" isn't included, the weekly_template must contain ZERO bike sessions. Never emit sessions in sports the athlete didn't pick — even if the race type would normally require it (e.g. someone training for an Ironman who explicitly excludes swim is doing pool-skip prep, respect their call).
+If conditioning emphasis is "high", schedule 2-3 strength/conditioning sessions per week. If "minimal", schedule 0-1. If "moderate", schedule 1-2.`
+    : "(not captured — assume default sports for the race type)"
+}
 
 CURRENT FITNESS:
 ${synced ? JSON.stringify({ athlete: synced.athlete, fitness: synced.fitness, derived: synced.derived, wkg: synced.wkg }, null, 2) : "(not synced)"}
