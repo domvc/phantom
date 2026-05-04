@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
+export const runtime = "edge";
+
 const PLAN_SYSTEM = `You are a senior endurance coach generating a phased training plan for an athlete. Output VALID JSON ONLY — no surrounding prose, no markdown fencing.
 
 You receive:

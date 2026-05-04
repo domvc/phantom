@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
+export const runtime = "edge";
+
 const SYSTEM_PROMPT = `You are a coach helping the athlete amend their training plan for a SPECIFIC week. Be focused, concise, evidence-based.
 
 Process:

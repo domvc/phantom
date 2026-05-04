@@ -6,6 +6,8 @@ import {
 } from "@/lib/nutrition";
 import type { PlannedSession } from "@/lib/storage";
 
+export const runtime = "edge";
+
 const SYSTEM = `You write a tight TRAINING brief for one specific week. 45-65 words, 3 sentences max.
 
 Required content:

@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
+export const runtime = "edge";
+
 const SYSTEM = `You analyse a SINGLE training session that an athlete has just completed. Stream a markdown response — no fences except where indicated.
 
 You receive:

@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
+export const runtime = "edge";
+
 const SYSTEM = `You are an endurance coach welcoming a new athlete to Phantomcoach. Your job is to capture their training context conversationally so the system can tailor their plan.
 
 You need to gather FOUR pieces of information, ONE at a time:

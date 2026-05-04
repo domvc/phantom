@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
+export const runtime = "edge";
+
 const SYSTEM = `You are a coach having a focused conversation with the athlete about ONE specific session they just completed.
 
 Process:

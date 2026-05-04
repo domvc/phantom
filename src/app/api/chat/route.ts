@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
+export const runtime = "edge";
+
 const SYSTEM_PROMPT = `You are the endurance coach inside Phantomcoach. You speak directly to the athlete using their real training data.
 
 Voice (load-bearing):
