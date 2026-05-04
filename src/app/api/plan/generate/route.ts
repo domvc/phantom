@@ -167,28 +167,15 @@ Output JSON now.`;
 
   const client = new Anthropic({ apiKey });
 
-  // Stream tokens from Anthropic and flush keepalive whitespace to the client
-  // so Netlify's edge idle-timeout doesn't kill the connection during the
-  // ~30-40s plan generation. The body stays valid JSON because JSON.parse
-  // ignores leading/interleaved whitespace before the actual object.
+  // Stream raw model tokens directly to the client. Client parses the JSON
+  // and constructs the plan envelope locally. This avoids Netlify's edge
+  // response buffering, which silently drops the trailing flush when we
+  // try to send a single large JSON body at the end.
   const encoder = new TextEncoder();
   const body = new ReadableStream({
     async start(controller) {
-      // Initial flush so TTFB is immediate
-      controller.enqueue(encoder.encode(" "));
-
-      let lastFlush = Date.now();
-      const flushKeepalive = () => {
-        if (Date.now() - lastFlush > 5000) {
-          try {
-            controller.enqueue(encoder.encode(" "));
-            lastFlush = Date.now();
-          } catch {}
-        }
-      };
-
-      let fullText = "";
-      let final: unknown;
+      // Initial flush so headers go out immediately
+      controller.enqueue(encoder.encode("\n"));
 
       try {
         const stream = client.messages.stream({
@@ -199,57 +186,27 @@ Output JSON now.`;
         });
 
         for await (const event of stream) {
-          flushKeepalive();
           if (
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
-            fullText += event.delta.text;
+            controller.enqueue(encoder.encode(event.delta.text));
           }
         }
-
-        let raw = fullText.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
-        try {
-          const plan = JSON.parse(raw);
-          final = {
-            ok: true,
-            plan: {
-              generated_at: new Date().toISOString(),
-              race: {
-                name: raceGoal.name,
-                date: raceGoal.date,
-                type: raceGoal.type,
-              },
-              total_weeks: plan.total_weeks ?? totalWeeks,
-              phases: plan.phases ?? [],
-              milestones: plan.milestones ?? [],
-              rationale: plan.rationale,
-            },
-          };
-        } catch (e) {
-          final = {
-            ok: false,
-            error: "Plan JSON parse failed",
-            detail: e instanceof Error ? e.message : "unknown",
-            raw: raw.slice(0, 500),
-          };
-        }
       } catch (e) {
-        final = {
-          ok: false,
-          error: e instanceof Error ? e.message : "Network error",
-        };
+        const msg = e instanceof Error ? e.message : "Network error";
+        controller.enqueue(encoder.encode("\n__STREAM_ERROR__:" + msg));
+      } finally {
+        controller.close();
       }
-
-      controller.enqueue(encoder.encode(JSON.stringify(final)));
-      controller.close();
     },
   });
 
   return new Response(body, {
     headers: {
-      "content-type": "application/json",
+      "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
+      "x-accel-buffering": "no",
     },
   });
 }
