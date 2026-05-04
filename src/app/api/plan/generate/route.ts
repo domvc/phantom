@@ -84,8 +84,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = await req.json().catch(() => ({}));
-  const { synced, raceGoal, athleteNotes, amendments, sessionFeedbacks } = body;
+  const reqBody = await req.json().catch(() => ({}));
+  const { synced, raceGoal, athleteNotes, amendments, sessionFeedbacks } = reqBody;
 
   if (!raceGoal?.date) {
     return NextResponse.json({ ok: false, error: "No race goal set" }, { status: 400 });
@@ -167,60 +167,89 @@ Output JSON now.`;
 
   const client = new Anthropic({ apiKey });
 
-  try {
-    const res = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 12000,
-      system: PLAN_SYSTEM,
-      messages: [{ role: "user", content: userPrompt }],
-    });
+  // Stream tokens from Anthropic and flush keepalive whitespace to the client
+  // so Netlify's edge idle-timeout doesn't kill the connection during the
+  // ~30-40s plan generation. The body stays valid JSON because JSON.parse
+  // ignores leading/interleaved whitespace before the actual object.
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    async start(controller) {
+      // Initial flush so TTFB is immediate
+      controller.enqueue(encoder.encode(" "));
 
-    const textBlock = res.content.find((c) => c.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      return NextResponse.json(
-        { ok: false, error: "No text in model response" },
-        { status: 500 }
-      );
-    }
+      let lastFlush = Date.now();
+      const flushKeepalive = () => {
+        if (Date.now() - lastFlush > 5000) {
+          try {
+            controller.enqueue(encoder.encode(" "));
+            lastFlush = Date.now();
+          } catch {}
+        }
+      };
 
-    let raw = textBlock.text.trim();
-    // Strip markdown fence if model added one despite instructions
-    raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+      let fullText = "";
+      let final: unknown;
 
-    let plan;
-    try {
-      plan = JSON.parse(raw);
-    } catch (e) {
-      return NextResponse.json(
-        {
+      try {
+        const stream = client.messages.stream({
+          model: "claude-sonnet-4-6",
+          max_tokens: 12000,
+          system: PLAN_SYSTEM,
+          messages: [{ role: "user", content: userPrompt }],
+        });
+
+        for await (const event of stream) {
+          flushKeepalive();
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            fullText += event.delta.text;
+          }
+        }
+
+        let raw = fullText.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+        try {
+          const plan = JSON.parse(raw);
+          final = {
+            ok: true,
+            plan: {
+              generated_at: new Date().toISOString(),
+              race: {
+                name: raceGoal.name,
+                date: raceGoal.date,
+                type: raceGoal.type,
+              },
+              total_weeks: plan.total_weeks ?? totalWeeks,
+              phases: plan.phases ?? [],
+              milestones: plan.milestones ?? [],
+              rationale: plan.rationale,
+            },
+          };
+        } catch (e) {
+          final = {
+            ok: false,
+            error: "Plan JSON parse failed",
+            detail: e instanceof Error ? e.message : "unknown",
+            raw: raw.slice(0, 500),
+          };
+        }
+      } catch (e) {
+        final = {
           ok: false,
-          error: "Plan JSON parse failed",
-          detail: e instanceof Error ? e.message : "unknown",
-          raw: raw.slice(0, 500),
-        },
-        { status: 500 }
-      );
-    }
+          error: e instanceof Error ? e.message : "Network error",
+        };
+      }
 
-    return NextResponse.json({
-      ok: true,
-      plan: {
-        generated_at: new Date().toISOString(),
-        race: {
-          name: raceGoal.name,
-          date: raceGoal.date,
-          type: raceGoal.type,
-        },
-        total_weeks: plan.total_weeks ?? totalWeeks,
-        phases: plan.phases ?? [],
-        milestones: plan.milestones ?? [],
-        rationale: plan.rationale,
-      },
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : "Network error" },
-      { status: 500 }
-    );
-  }
+      controller.enqueue(encoder.encode(JSON.stringify(final)));
+      controller.close();
+    },
+  });
+
+  return new Response(body, {
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    },
+  });
 }
