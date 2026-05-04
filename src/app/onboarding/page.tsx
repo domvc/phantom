@@ -772,6 +772,7 @@ function GoalsChatStep({
           messages: history,
           athleteName: s.intervals?.athleteName,
           raceGoal: s.raceGoal,
+          trainingPrefs: s.trainingPrefs,
         }),
       });
       if (!res.ok || !res.body) {
@@ -1098,6 +1099,7 @@ function buildTailoredProgressLines(
   const runTypes: RaceGoal["type"][] = ["5K", "10K", "HM", "Marathon"];
   const isTri = triTypes.includes(raceGoal.type);
   const isRun = runTypes.includes(raceGoal.type);
+  const isUltra = raceGoal.type === "Ultra";
 
   const exclusionText = `${notes?.constraints || ""} ${notes?.weeklyPattern || ""}`.toLowerCase();
   const noSwim = /no swim|skip swim|no pool|pool closed|can'?t swim/.test(exclusionText);
@@ -1123,6 +1125,8 @@ function buildTailoredProgressLines(
       ? "10K"
       : raceGoal.type === "5K"
       ? "5K"
+      : raceGoal.type === "Ultra"
+      ? "ultra"
       : "race";
 
   const raceName = raceGoal.name || raceLabel;
@@ -1133,7 +1137,15 @@ function buildTailoredProgressLines(
     `Mapping ${weeks} ${weeks === 1 ? "week" : "weeks"} from today to ${raceName}…`
   );
 
-  if (isTri) {
+  if (isUltra) {
+    lines.push("Designing ultra phases — base, time-on-feet, peak, taper…");
+    const fmt = (raceGoal.raceDetails || "").toLowerCase();
+    if (/backyard/.test(fmt) || /loop/.test(fmt)) {
+      lines.push("Sequencing loop pacing, fuelling rhythm, and night-running rehearsal…");
+    } else {
+      lines.push("Sequencing back-to-back long runs, hike-walk-run pacing, race-specific fuelling…");
+    }
+  } else if (isTri) {
     lines.push("Designing tri-specific phases — base, build, peak, taper…");
     const sports: string[] = [];
     if (!noSwim) sports.push("swim");

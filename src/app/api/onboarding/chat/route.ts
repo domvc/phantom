@@ -20,7 +20,7 @@ RULES:
   (a) Reply with one closing line (e.g. "That's everything I need — building your plan now.").
   (b) Call the save_athlete_notes tool with the four extracted strings.
 - British spelling. Direct. No bullet lists or markdown — plain conversational text only.
-- The athlete already gave their race details before this conversation, so DO NOT ask about the race itself.
+- The athlete already gave their race details and training preferences (sports, equipment access, conditioning emphasis) before this conversation. DO NOT ask about the race itself, which sports they want, or whether they have a bike/pool/gym — those are already captured.
 
 START IMMEDIATELY with a brief greeting (one short sentence, address them by name if known) and the first question (about their weekly training pattern). No preamble.`;
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { messages, athleteName, raceGoal } = body;
+  const { messages, athleteName, raceGoal, trainingPrefs } = body;
 
   if (!Array.isArray(messages)) {
     return new Response(JSON.stringify({ error: "no messages" }), { status: 400 });
@@ -76,7 +76,12 @@ Race already captured: ${
     raceGoal
       ? `${raceGoal.name} (${raceGoal.type}) on ${raceGoal.date}${
           raceGoal.targetTime ? ` · target ${raceGoal.targetTime}` : ""
-        }`
+        }${raceGoal.raceDetails ? ` · format: ${raceGoal.raceDetails}` : ""}`
+      : "(none)"
+  }
+Training preferences already captured: ${
+    trainingPrefs
+      ? `sports: ${(trainingPrefs.sports || []).join(", ") || "(none)"}; bike: ${trainingPrefs.hasBike === false ? "indoor only" : "yes"}; pool: ${trainingPrefs.hasPool === false ? "limited" : "yes"}; conditioning: ${trainingPrefs.conditioningEmphasis || "moderate"}`
       : "(none)"
   }`;
 
