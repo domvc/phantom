@@ -125,12 +125,12 @@ function Hero() {
         <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-12 items-center">
           {/* Left: copy block */}
           <div>
-            <h1 className="font-black tracking-[-0.045em] leading-[0.94] text-[3rem] sm:text-[3.8rem] lg:text-[4.8rem]">
+            <h1 className="font-black tracking-[-0.045em] leading-[0.94] text-[2.6rem] sm:text-[3.6rem] lg:text-[4.8rem]">
               <span className="block text-white">Train like an elite athlete</span>
               <span className="block text-accent">like never before.</span>
             </h1>
 
-            <p className="mt-9 text-lg sm:text-xl text-white/85 leading-relaxed max-w-xl">
+            <p className="mt-7 sm:mt-9 text-[16.5px] sm:text-xl text-white/85 leading-relaxed max-w-xl">
               <span className="text-white font-semibold">
                 Connect your data. Set your goal. Get the plan that gets you
                 there.
@@ -140,23 +140,23 @@ function Hero() {
               — calibrated to you, recalibrated every day.
             </p>
 
-            <div className="mt-10 flex flex-col sm:flex-row gap-3 sm:items-center">
+            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:items-center">
               <Link
                 href="/onboarding"
-                className="px-6 py-3.5 bg-accent hover:bg-accent-h text-white text-sm font-semibold rounded-md transition shadow-[0_8px_30px_-10px_rgba(193,68,14,0.6)] inline-flex items-center justify-center gap-2"
+                className="px-6 py-3.5 bg-accent hover:bg-accent-h text-white text-[13.5px] font-bold rounded-md transition shadow-[0_8px_30px_-10px_rgba(193,68,14,0.6)] inline-flex items-center justify-center gap-2"
               >
                 Build my plan · 5 minutes
                 <span aria-hidden>→</span>
               </Link>
               <Link
                 href="#how"
-                className="px-6 py-3.5 border border-white/15 hover:border-white/35 text-white/80 hover:text-white text-sm font-semibold rounded-md transition text-center"
+                className="px-6 py-3.5 border border-white/15 hover:border-white/35 text-white/80 hover:text-white text-[13.5px] font-semibold rounded-md transition text-center"
               >
                 See how it works
               </Link>
             </div>
 
-            <p className="mt-6 text-xs text-white/45">
+            <p className="mt-6 text-[11.5px] text-white/45">
               14 days free. £5 a month after. The coaching elites pay £400 a
               month for.
             </p>
@@ -457,18 +457,18 @@ function SocialProof() {
   ];
   return (
     <section className="border-y border-border-soft bg-surface">
-      <div className="max-w-6xl mx-auto px-6 py-9">
-        <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted font-semibold text-center mb-5">
+      <div className="max-w-6xl mx-auto px-6 py-10 sm:py-12">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-text-muted font-extrabold text-center mb-6">
           Reads the apps you already train on
         </div>
-        <div className="flex flex-wrap gap-x-10 gap-y-5 items-center justify-center text-text-muted">
+        <div className="flex flex-wrap gap-x-8 sm:gap-x-10 gap-y-5 items-center justify-center text-text-muted">
           {logos.map((l, i) => (
             <span key={i} className="hover:text-text transition-colors">
               {l}
             </span>
           ))}
         </div>
-        <div className="mt-7 pt-5 border-t border-border-soft flex flex-wrap gap-x-6 gap-y-2 items-center justify-center text-[10.5px] uppercase tracking-[0.14em] text-text-muted font-semibold">
+        <div className="mt-8 pt-6 border-t border-border-soft flex flex-wrap gap-x-6 gap-y-2 items-center justify-center text-[10px] uppercase tracking-[0.16em] text-text-muted font-extrabold">
           <span>Built by athletes</span>
           <span className="text-border">·</span>
           <span>Grounded in peer-reviewed sport science</span>
@@ -546,13 +546,15 @@ function Features() {
     },
   ];
   return (
-    <section className="max-w-6xl mx-auto w-full px-6 py-24">
-      <div className="max-w-2xl mb-14">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-accent font-semibold mb-3">
+    <section className="max-w-6xl mx-auto w-full px-6 py-24 sm:py-28">
+      <div className="max-w-3xl mb-14">
+        <div className="text-[10.5px] uppercase tracking-[0.18em] text-accent font-extrabold mb-4">
           Three pillars
         </div>
-        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-          Data. Science. Action. Three things make goals real.
+        <h2 className="font-black tracking-[-0.035em] leading-[0.95] text-[2.4rem] sm:text-[3.2rem] text-text">
+          Data. Science. Action.
+          <br />
+          <span className="text-text-mid">Three things make goals real.</span>
         </h2>
       </div>
       <div className="grid md:grid-cols-3 gap-5">
@@ -563,7 +565,7 @@ function Features() {
           >
             <div className="min-h-[110px]">{it.visual}</div>
             <div>
-              <h3 className="text-base font-bold text-text mb-2 tracking-tight">
+              <h3 className="text-[15px] font-extrabold text-text mb-2 tracking-tight">
                 {it.title}
               </h3>
               <p className="text-[13px] text-text-mid leading-relaxed">{it.body}</p>
@@ -605,15 +607,17 @@ function Sports() {
   ];
   return (
     <section className="border-y border-border-soft bg-surface">
-      <div className="max-w-6xl mx-auto w-full px-6 py-24">
-        <div className="max-w-2xl mb-14">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-accent font-semibold mb-3">
+      <div className="max-w-6xl mx-auto w-full px-6 py-24 sm:py-28">
+        <div className="max-w-3xl mb-14">
+          <div className="text-[10.5px] uppercase tracking-[0.18em] text-accent font-extrabold mb-4">
             One coach, every discipline
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-            Five sports. One programme. Sequenced to compound.
+          <h2 className="font-black tracking-[-0.035em] leading-[0.95] text-[2.4rem] sm:text-[3.2rem] text-text">
+            Five sports.
+            <br />
+            <span className="text-accent">One programme.</span>
           </h2>
-          <p className="mt-4 text-[14px] text-text-mid leading-relaxed">
+          <p className="mt-5 text-[14px] sm:text-[15px] text-text-mid leading-relaxed max-w-xl">
             Most apps specialise in one thing. Phantomcoach reads your week as
             integrated load — running, cycling, swimming, strength, mobility —
             sequenced so each session multiplies the next.
@@ -628,7 +632,7 @@ function Sports() {
               <div className="size-9 rounded-md bg-accent-soft border border-accent-mid flex items-center justify-center mb-4">
                 {s.icon}
               </div>
-              <h3 className="text-[14.5px] font-bold text-text mb-1.5 tracking-tight">
+              <h3 className="text-[15px] font-extrabold text-text mb-1.5 tracking-tight">
                 {s.name}
               </h3>
               <p className="text-[12.5px] text-text-mid leading-relaxed">
@@ -677,18 +681,18 @@ function WhatsInside() {
   ];
   return (
     <section id="inside" className="bg-bg">
-      <div className="max-w-6xl mx-auto w-full px-6 py-24">
+      <div className="max-w-6xl mx-auto w-full px-6 py-24 sm:py-28">
         <div className="grid lg:grid-cols-[5fr_7fr] gap-x-12 gap-y-10">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.12em] text-accent font-semibold mb-3">
+            <div className="text-[10.5px] uppercase tracking-[0.18em] text-accent font-extrabold mb-4">
               What&apos;s inside
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text mb-5">
+            <h2 className="font-black tracking-[-0.035em] leading-[0.95] text-[2.4rem] sm:text-[3.2rem] text-text mb-6">
               Not a chat wrapper.
               <br />
               <span className="text-accent">A coaching system.</span>
             </h2>
-            <p className="text-[14px] text-text-mid leading-relaxed mb-5">
+            <p className="text-[14.5px] text-text-mid leading-relaxed mb-5">
               Years of curation, layered into one brain. Phantomcoach knows
               what&apos;s been proven — then reads your data and applies it.
             </p>
@@ -755,22 +759,24 @@ function HowItWorks() {
   ];
   return (
     <section id="how" className="border-y border-border-soft bg-surface">
-      <div className="max-w-6xl mx-auto w-full px-6 py-24">
-        <div className="max-w-2xl mb-14">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-accent font-semibold mb-3">
+      <div className="max-w-6xl mx-auto w-full px-6 py-24 sm:py-28">
+        <div className="max-w-3xl mb-14">
+          <div className="text-[10.5px] uppercase tracking-[0.18em] text-accent font-extrabold mb-4">
             How it works
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-            Four steps. Under five minutes. Then you train.
+          <h2 className="font-black tracking-[-0.035em] leading-[0.95] text-[2.4rem] sm:text-[3.2rem] text-text">
+            Four steps. Under five minutes.
+            <br />
+            <span className="text-accent">Then you train.</span>
           </h2>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {steps.map((s) => (
             <div key={s.n} className="bg-bg border border-border-soft rounded-lg p-7">
-              <div className="font-bold text-3xl text-accent tracking-tight mb-4">
+              <div className="font-black text-4xl text-accent tracking-[-0.035em] mb-4">
                 {s.n}
               </div>
-              <h3 className="text-base font-bold text-text mb-2 tracking-tight">
+              <h3 className="text-[15px] font-extrabold text-text mb-2 tracking-tight">
                 {s.title}
               </h3>
               <p className="text-[13px] text-text-mid leading-relaxed">{s.body}</p>
@@ -794,43 +800,65 @@ function Pricing() {
     "Sync from Garmin, Strava, Intervals.icu — no manual logging",
   ];
   return (
-    <section id="pricing" className="max-w-6xl mx-auto w-full px-6 py-24">
-      <div className="max-w-2xl mx-auto text-center mb-12">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-accent font-semibold mb-3">
-          Pricing
-        </div>
-        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-          Elite frameworks. Coffee money.
-        </h2>
-        <p className="mt-4 text-[14px] text-text-mid leading-relaxed">
-          A human coach is £200 to £600 a month. Phantomcoach is £5. Same
-          frameworks. Faster. Always on.
-        </p>
+    <section id="pricing" className="relative bg-black text-white overflow-hidden">
+      {/* Atmospheric gradient + glow */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 40%, rgba(193,68,14,0.18), transparent 55%), radial-gradient(circle at 20% 90%, rgba(193,68,14,0.10), transparent 50%)",
+          }}
+        />
+        <svg className="absolute inset-0 w-full h-full opacity-[0.04]" aria-hidden>
+          <filter id="grain-pricing">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" />
+          </filter>
+          <rect width="100%" height="100%" filter="url(#grain-pricing)" />
+        </svg>
       </div>
-      <div className="max-w-md mx-auto bg-surface border-2 border-accent rounded-lg p-9">
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-5xl font-bold tracking-tight text-text">£5</span>
-          <span className="text-text-muted text-sm">/ month</span>
+
+      <div className="relative max-w-6xl mx-auto w-full px-6 py-24 sm:py-32">
+        <div className="max-w-3xl mx-auto text-center mb-14">
+          <div className="text-[10.5px] uppercase tracking-[0.18em] text-accent font-extrabold mb-4">
+            Pricing
+          </div>
+          <h2 className="font-black tracking-[-0.035em] leading-[0.95] text-[2.6rem] sm:text-[3.6rem] text-white">
+            Elite frameworks.
+            <br />
+            <span className="text-accent">Coffee money.</span>
+          </h2>
+          <p className="mt-6 text-[14.5px] sm:text-[15.5px] text-white/70 leading-relaxed max-w-xl mx-auto">
+            A human coach is £200 to £600 a month. Phantomcoach is £5. Same
+            frameworks. Faster. Always on.
+          </p>
         </div>
-        <div className="text-[12px] text-text-muted mb-6">
-          14 days free · cancel anytime
+
+        <div className="max-w-md mx-auto bg-white/[0.04] border border-white/15 backdrop-blur-sm rounded-xl p-9 shadow-[0_30px_80px_rgba(193,68,14,0.18)]">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-6xl font-black tracking-[-0.04em] text-white">£5</span>
+            <span className="text-white/50 text-sm">/ month</span>
+          </div>
+          <div className="text-[12px] text-white/50 mb-7">
+            14 days free · cancel anytime
+          </div>
+          <ul className="space-y-3 mb-8 text-[13px] text-white/80">
+            {features.map((f, i) => (
+              <li key={i} className="flex items-start gap-2.5">
+                <span className="size-4 rounded-full bg-accent/20 border border-accent text-accent flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <CheckIcon size={9} />
+                </span>
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+          <Link
+            href="/onboarding"
+            className="block text-center px-5 py-3.5 bg-accent hover:bg-accent-h text-white text-[13.5px] font-bold rounded-md transition shadow-[0_8px_24px_rgba(193,68,14,0.4)]"
+          >
+            Start 14-day free trial
+          </Link>
         </div>
-        <ul className="space-y-3 mb-8 text-[13px] text-text-mid">
-          {features.map((f, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <span className="size-4 rounded-full bg-accent-soft border border-accent-mid text-accent flex items-center justify-center flex-shrink-0 mt-0.5">
-                <CheckIcon size={9} />
-              </span>
-              <span>{f}</span>
-            </li>
-          ))}
-        </ul>
-        <Link
-          href="/onboarding"
-          className="block text-center px-5 py-3 bg-accent hover:bg-accent-h text-white text-[13px] font-semibold rounded-md transition"
-        >
-          Start 14-day free trial
-        </Link>
       </div>
     </section>
   );
@@ -881,12 +909,12 @@ function FAQ() {
   ];
   return (
     <section id="faq">
-      <div className="max-w-3xl mx-auto px-6 py-24">
-        <div className="text-center mb-12">
-          <div className="text-[11px] uppercase tracking-[0.12em] text-accent font-semibold mb-3">
+      <div className="max-w-3xl mx-auto px-6 py-24 sm:py-28">
+        <div className="text-center mb-14">
+          <div className="text-[10.5px] uppercase tracking-[0.18em] text-accent font-extrabold mb-4">
             FAQ
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
+          <h2 className="font-black tracking-[-0.035em] leading-[0.95] text-[2.4rem] sm:text-[3.2rem] text-text">
             Common questions.
           </h2>
         </div>
@@ -896,7 +924,7 @@ function FAQ() {
               key={i}
               className="group bg-surface border border-border-soft rounded-lg p-5 hover:border-border transition"
             >
-              <summary className="flex items-center justify-between cursor-pointer list-none font-semibold text-[14px] text-text gap-4">
+              <summary className="flex items-center justify-between cursor-pointer list-none font-extrabold text-[14.5px] text-text gap-4 tracking-tight">
                 <span>{it.q}</span>
                 <span className="text-text-muted group-open:rotate-45 transition-transform text-xl leading-none flex-shrink-0">
                   +
@@ -913,20 +941,20 @@ function FAQ() {
 
 function Footer() {
   return (
-    <footer className="border-t border-border-soft mt-auto bg-surface">
+    <footer className="bg-black text-white mt-auto">
       <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="text-[14px]">
+          <div className="text-[14px] text-white">
             <PhantomLogo size={18} />
           </div>
-          <div className="text-[11px] text-text-muted mt-1.5">
+          <div className="text-[11px] text-white/40 mt-1.5">
             © 2026 Phantomcoach · Built by athletes · Powered by Claude
           </div>
         </div>
-        <div className="flex gap-5 text-[12px] text-text-muted">
-          <a href="#" className="hover:text-text transition">Privacy</a>
-          <a href="#" className="hover:text-text transition">Terms</a>
-          <a href="mailto:hello@phantomcoach.app" className="hover:text-text transition">
+        <div className="flex gap-5 text-[12px] text-white/50">
+          <a href="#" className="hover:text-white transition">Privacy</a>
+          <a href="#" className="hover:text-white transition">Terms</a>
+          <a href="mailto:hello@phantomcoach.app" className="hover:text-white transition">
             Contact
           </a>
         </div>
