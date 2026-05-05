@@ -134,6 +134,20 @@ export default function DashboardLayout({
             )}
           </div>
         </nav>
+        {/* Auth status footer */}
+        <div className="px-3 py-2.5 border-t border-border-soft text-[10px] text-text-muted">
+          {!cloud.configured ? (
+            <span title="Data lives in this browser only — see SUPABASE_SETUP.md to enable cloud sync">
+              Demo mode · local only
+            </span>
+          ) : cloud.user ? (
+            <span className="truncate block" title={cloud.user.email ?? undefined}>
+              ☁ {cloud.user.email}
+            </span>
+          ) : (
+            <span>Not signed in</span>
+          )}
+        </div>
       </aside>
       <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
     </div>

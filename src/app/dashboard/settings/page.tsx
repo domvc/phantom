@@ -46,8 +46,17 @@ export default function SettingsPage() {
     setTimeout(() => setSavedFlash(false), 2000);
   }
 
-  function handleReset() {
-    if (!confirm("This wipes your demo state and restarts onboarding. Continue?")) return;
+  async function handleReset() {
+    const sb = getSupabase();
+    const signedIn = sb ? (await sb.auth.getUser()).data.user : null;
+    const msg = signedIn
+      ? "This wipes your stored plan, race goal, and history (cloud + local) and restarts onboarding. Continue?"
+      : "This wipes your demo state and restarts onboarding. Continue?";
+    if (!confirm(msg)) return;
+    if (sb && signedIn) {
+      // Clear the cloud row too so it can't rehydrate stale state on the next page load
+      await sb.from("user_state").delete().eq("user_id", signedIn.id);
+    }
     clearUserState();
     router.push("/onboarding");
   }
