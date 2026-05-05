@@ -89,6 +89,33 @@ export type SessionType =
 
 export type SessionSport = "bike" | "run" | "swim" | "strength" | "brick" | "rest";
 
+/**
+ * A structured interval inside a session. Used for .pwx export to TrainingPeaks etc.
+ * Optional — only emitted for bike/run sessions where structured targets are useful.
+ */
+export type IntervalStep = {
+  /** Logical role: warmup, steady, work (interval), recovery, cooldown */
+  kind: "warmup" | "steady" | "work" | "recovery" | "cooldown";
+  /** Duration in seconds */
+  duration_s: number;
+  /** Target metric — power for bike, pace for run, hr fallback */
+  target_type: "power_pct_ftp" | "power_w" | "hr_pct_lthr" | "pace" | "rpe" | "free";
+  /** Lower bound of target range */
+  target_low?: number;
+  /** Upper bound of target range */
+  target_high?: number;
+  /** Free-text label for the step (e.g. "Z2 main", "VO2 rep") */
+  label?: string;
+};
+
+/**
+ * If the session is a structured interval set (e.g. "5 × 4min @ VO2 / 3min easy"),
+ * encode it as a repeated block rather than expanding all 10 steps inline.
+ */
+export type IntervalBlock =
+  | { type: "step"; step: IntervalStep }
+  | { type: "repeat"; count: number; steps: IntervalStep[] };
+
 export type PlannedSession = {
   slot: "AM" | "PM" | "OPTIONAL" | "REST" | "";
   type: SessionType;
@@ -96,6 +123,8 @@ export type PlannedSession = {
   duration: string;
   summary: string;
   sport?: SessionSport;
+  /** Structured workout description for .pwx / .zwo export. Optional — older plans don't have it. */
+  intervals?: IntervalBlock[];
 };
 
 export type WeeklyTemplate = {
@@ -186,7 +215,7 @@ export type UserState = {
   briefVersion?: number;
 };
 
-const CURRENT_BRIEF_VERSION = 4;
+const CURRENT_BRIEF_VERSION = 5;
 
 const KEY = "phantomcoach:user";
 

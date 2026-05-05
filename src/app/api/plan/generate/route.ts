@@ -43,6 +43,8 @@ Session object — keep ALL fields short:
   "sport": "bike"|"run"|"swim"|"strength"|"brick"|"rest"
 }
 
+(Structured intervals for export/.pwx are generated on-demand by a separate endpoint — DO NOT emit intervals here.)
+
 Hard rules:
 1. Each day is an array. Rest day: [{"slot":"REST","type":"rest","title":"Rest","duration":"—","summary":"Rest. Sleep 8h+.","sport":"rest"}].
 2. AM and PM are SEPARATE entries. Never combine.

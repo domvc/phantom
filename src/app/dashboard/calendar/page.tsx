@@ -10,6 +10,8 @@ import {
   type UserState,
 } from "@/lib/storage";
 import { computeNutritionTargets } from "@/lib/nutrition";
+import { weekToText, weekToCsv, copyToClipboard, type DayKey } from "@/lib/exports";
+import { downloadFile, safeFilename } from "@/lib/pwx";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";
 import AmendmentChatModal from "@/components/AmendmentChatModal";
 import {
@@ -208,10 +210,51 @@ function WeekRow({
     ? `This week (${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})`
     : `Week of ${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
 
+  // Build the weekly_template lookup once for export
+  const weekTemplate: Record<DayKey, PlannedSession[]> = useMemo(() => {
+    const out = {} as Record<DayKey, PlannedSession[]>;
+    DAY_KEYS.forEach((key, i) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      const dayPhase = phaseForDate(allPhases, date) || phase;
+      out[key as DayKey] = dayPhase
+        ? normalizeDay(
+            dayPhase.weekly_template[key as keyof typeof dayPhase.weekly_template]
+          )
+        : [];
+    });
+    return out;
+  }, [monday, allPhases, phase]);
+
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+
+  const dateLabel = monday.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  function handleCopy() {
+    const text = weekToText({
+      monday,
+      weekly_template: weekTemplate,
+      phaseName: phase?.name,
+      raceName: user.plan?.race?.name,
+    });
+    copyToClipboard(text).then((ok) => {
+      if (ok) {
+        setCopyState("copied");
+        setTimeout(() => setCopyState("idle"), 1800);
+      }
+    });
+  }
+
+  function handleCsv() {
+    const csv = weekToCsv({ monday, weekly_template: weekTemplate });
+    const filename = safeFilename(`week-${monday.toISOString().slice(0, 10)}`, "csv");
+    downloadFile(filename, csv, "text/csv");
+  }
+
   return (
     <div ref={ref} className="scroll-mt-4">
       {/* Week label strip */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 gap-3">
         <div className="flex items-baseline gap-3 flex-wrap">
           <div
             className={`text-[11px] uppercase tracking-[0.1em] font-bold ${
@@ -239,6 +282,33 @@ function WeekRow({
                 : ""}
             </div>
           )}
+        </div>
+
+        {/* Week-level export toolbar */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={handleCopy}
+            title={`Copy week of ${dateLabel} as text`}
+            className="px-2.5 py-1 text-[11px] font-semibold rounded border border-border-soft hover:border-accent hover:text-accent text-text-muted transition flex items-center gap-1.5"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            {copyState === "copied" ? "Copied" : "Copy"}
+          </button>
+          <button
+            onClick={handleCsv}
+            title={`Download week of ${dateLabel} as CSV`}
+            className="px-2.5 py-1 text-[11px] font-semibold rounded border border-border-soft hover:border-accent hover:text-accent text-text-muted transition flex items-center gap-1.5"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            CSV
+          </button>
         </div>
       </div>
 

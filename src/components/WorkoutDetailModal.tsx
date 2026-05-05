@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PlannedSession, PlanPhase, SyncedData, AthleteNotes } from "@/lib/storage";
+import type {
+  PlannedSession,
+  PlanPhase,
+  SyncedData,
+  AthleteNotes,
+  IntervalBlock,
+} from "@/lib/storage";
+import { sessionToPwx, downloadFile, safeFilename } from "@/lib/pwx";
 
 type WorkoutDetail = {
   title: string;
@@ -77,6 +84,8 @@ export default function WorkoutDetailModal({
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"detail" | "garmin" | "tp">("detail");
   const [copied, setCopied] = useState<string | null>(null);
+  const [pwxState, setPwxState] = useState<"idle" | "generating" | "error">("idle");
+  const [pwxError, setPwxError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -169,8 +178,64 @@ export default function WorkoutDetailModal({
     });
   }
 
+  async function downloadPwx() {
+    if (!session) return;
+    setPwxState("generating");
+    setPwxError(null);
+    try {
+      const res = await fetch("/api/workout/intervals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, athlete: synced?.athlete }),
+      });
+      if (!res.ok || !res.body) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let raw = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        raw += decoder.decode(value, { stream: true });
+      }
+      raw += decoder.decode();
+
+      const errMarker = raw.indexOf("__STREAM_ERROR__:");
+      if (errMarker !== -1) {
+        throw new Error(raw.slice(errMarker + "__STREAM_ERROR__:".length).trim());
+      }
+
+      const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+      const parsed = JSON.parse(cleaned) as { intervals?: IntervalBlock[] };
+      if (!Array.isArray(parsed.intervals) || parsed.intervals.length === 0) {
+        throw new Error("Model returned no intervals");
+      }
+
+      const xml = sessionToPwx({
+        session,
+        intervals: parsed.intervals,
+        date: date || new Date().toISOString().slice(0, 10),
+        athlete: synced?.athlete
+          ? {
+              ftp: synced.athlete.ftp,
+              lthr: synced.athlete.lthr,
+              weight: synced.athlete.weight,
+            }
+          : {},
+      });
+      downloadFile(safeFilename(session.title || "workout", "pwx"), xml, "application/xml");
+      setPwxState("idle");
+    } catch (e) {
+      setPwxError(e instanceof Error ? e.message : "Download failed");
+      setPwxState("error");
+    }
+  }
+
   const titleDisplay = detail.title || session.title;
   const durationDisplay = detail.duration || session.duration || session.summary;
+  const canExport =
+    session.sport === "bike" || session.sport === "run" || session.type !== "rest";
 
   return (
     <div
@@ -193,14 +258,55 @@ export default function WorkoutDetailModal({
             <h2 className="text-xl font-bold tracking-tight">{titleDisplay}</h2>
             <div className="text-[12.5px] text-text-mid mt-1">{durationDisplay}</div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-text-muted hover:text-text text-2xl leading-none flex-shrink-0"
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {canExport && (
+              <button
+                onClick={downloadPwx}
+                disabled={pwxState === "generating"}
+                title="Download as TrainingPeaks .pwx"
+                className="px-3 py-1.5 text-[11.5px] font-semibold rounded-md border border-border hover:border-accent hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
+              >
+                {pwxState === "generating" ? (
+                  <>
+                    <span className="size-2 rounded-full bg-accent animate-pulse" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    .pwx
+                  </>
+                )}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-text-muted hover:text-text text-2xl leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
+        {pwxError && (
+          <div className="px-7 py-2 text-[11.5px] text-modify bg-modify-soft border-b border-modify/20">
+            ⚠️ {pwxError}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="px-7 border-b border-border-soft flex gap-1">
