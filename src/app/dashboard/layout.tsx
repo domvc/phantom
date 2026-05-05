@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getUserState, setUserState } from "@/lib/storage";
+import { useCloudSync } from "@/lib/useCloudSync";
 import { PhantomLogo, SyncIcon } from "@/components/icons";
 
 export default function DashboardLayout({
@@ -13,18 +14,28 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const cloud = useCloudSync();
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!cloud.ready) return;
+
+    // Auth guard: if Supabase is configured but the user isn't signed in,
+    // bounce to /sign-in. (Demo mode without Supabase: skip the guard.)
+    if (cloud.configured && !cloud.user) {
+      router.replace("/sign-in");
+      return;
+    }
+
     const s = getUserState();
     if (!s.onboardingComplete) {
       router.replace("/onboarding");
       return;
     }
     setReady(true);
-  }, [router]);
+  }, [router, cloud.ready, cloud.configured, cloud.user]);
 
   async function handleSync() {
     const s = getUserState();

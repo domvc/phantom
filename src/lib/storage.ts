@@ -242,11 +242,15 @@ export function setUserState(patch: Partial<UserState>) {
   const current = getUserState();
   const next = { ...current, ...patch };
   localStorage.setItem(KEY, JSON.stringify(next));
+  // Notify any listeners (e.g. cloud sync) that state changed.
+  // Using a custom event keeps storage.ts decoupled from sync layer.
+  window.dispatchEvent(new CustomEvent("phantomcoach:state-changed"));
 }
 
 export function clearUserState() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(KEY);
+  window.dispatchEvent(new CustomEvent("phantomcoach:state-changed"));
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   type AthleteNotes,
   type UserState,
 } from "@/lib/storage";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   PulseIcon,
   SparkIcon,
@@ -49,6 +50,13 @@ export default function SettingsPage() {
     if (!confirm("This wipes your demo state and restarts onboarding. Continue?")) return;
     clearUserState();
     router.push("/onboarding");
+  }
+
+  async function handleSignOut() {
+    const sb = getSupabase();
+    if (sb) await sb.auth.signOut();
+    clearUserState();
+    router.push("/sign-in");
   }
 
   return (
@@ -193,13 +201,32 @@ export default function SettingsPage() {
         )}
       </Section>
 
+      {/* Account / sign-out (only shown when auth is configured) */}
+      {isSupabaseConfigured() && (
+        <Section title="Account">
+          <div className="bg-surface border border-border-soft rounded-md p-5">
+            <div className="font-semibold text-[13px] mb-1">Sign out</div>
+            <div className="text-[12px] text-text-muted mb-4">
+              Your training plan, race goal, and history stay safe in the cloud — sign back in
+              from any device to continue.
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="px-4 py-2 bg-bg border border-border hover:border-accent hover:text-accent text-[12px] font-semibold rounded-md transition"
+            >
+              Sign out
+            </button>
+          </div>
+        </Section>
+      )}
+
       {/* Danger zone */}
       <Section title="Demo controls">
         <div className="bg-surface border border-border-soft rounded-md p-5">
           <div className="font-semibold text-[13px] mb-1">Reset demo state</div>
           <div className="text-[12px] text-text-muted mb-4">
-            Wipes localStorage and sends you back to onboarding. Useful for testing the flow
-            with different inputs.
+            Wipes local state{isSupabaseConfigured() ? " (cloud copy untouched)" : ""} and sends
+            you back to onboarding. Useful for testing the flow with different inputs.
           </div>
           <button
             onClick={handleReset}

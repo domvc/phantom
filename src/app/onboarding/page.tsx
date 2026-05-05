@@ -14,6 +14,7 @@ import {
   type TrainingPrefs,
   type SportPref,
 } from "@/lib/storage";
+import { useCloudSync } from "@/lib/useCloudSync";
 import {
   PhantomLogo,
   GarminWordmark,
@@ -43,16 +44,18 @@ const FLOW: Step[] = ["intervals", "race", "goals", "sync", "plan"];
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const cloud = useCloudSync();
   const [step, setStep] = useState<Step>("welcome");
 
-  // Resume mid-flow if user previously dropped out
+  // Resume mid-flow if user previously dropped out (after cloud hydrate, if any)
   useEffect(() => {
+    if (!cloud.ready) return;
     const s = getUserState();
     if (s.intervals && !s.raceGoal) setStep("race");
     else if (s.intervals && s.raceGoal && !s.athleteNotes) setStep("goals");
     else if (s.intervals && s.raceGoal && s.athleteNotes && !s.synced) setStep("sync");
     else if (s.synced && !s.plan) setStep("plan");
-  }, []);
+  }, [cloud.ready]);
 
   return (
     <main className="flex flex-1 flex-col">
