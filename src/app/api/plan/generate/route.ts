@@ -3,77 +3,59 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "edge";
 
-const PLAN_SYSTEM = `You are a senior endurance coach generating a phased training plan for an athlete. Output VALID JSON ONLY — no surrounding prose, no markdown fencing.
+const PLAN_SYSTEM = `You are a senior endurance coach generating a phased training plan. Output VALID JSON ONLY — no prose, no markdown.
 
-You receive:
-- Race goal (type, date, target time)
-- Current fitness state (CTL, ATL, FTP, weight)
-- Athlete notes (weekly pattern, holidays, secondary goals, constraints)
-- Today's date
+OUTPUT IS LATENCY-CRITICAL. Be terse. Every extra word costs the athlete time on the loading screen. Do not repeat yourself across sessions or phases.
 
-You output a structured plan with this schema:
+Schema:
 
 {
-  "total_weeks": <integer — weeks from today to race>,
+  "total_weeks": <int>,
   "phases": [
     {
-      "name": "<short phase name>",
-      "weeks_from_start": <integer — first week of phase>,
-      "weeks_to_end": <integer — last week of phase>,
+      "name": "<2-3 words, e.g. 'Base 1', 'Build', 'Peak', 'Taper'>",
+      "weeks_from_start": <int>,
+      "weeks_to_end": <int>,
       "start_date": "YYYY-MM-DD",
       "end_date": "YYYY-MM-DD",
-      "focus": "<one-sentence focus>",
-      "ctl_target_end": <integer or null>,
+      "focus": "<≤8 words>",
+      "ctl_target_end": <int or null>,
       "weekly_template": {
-        "monday":    [<session objects>],
-        "tuesday":   [<session objects>],
-        "wednesday": [<session objects>],
-        "thursday":  [<session objects>],
-        "friday":    [<session objects>],
-        "saturday":  [<session objects>],
-        "sunday":    [<session objects>]
+        "monday": [<session>], "tuesday": [<session>], "wednesday": [<session>],
+        "thursday": [<session>], "friday": [<session>],
+        "saturday": [<session>], "sunday": [<session>]
       }
     }
   ],
   "milestones": [
-    {
-      "date": "YYYY-MM-DD",
-      "title": "<short>",
-      "desc": "<one-line>",
-      "type": "test" | "ramp_up" | "race" | "checkpoint" | "phase_end"
-    }
-  ],
-  "rationale": "<2-3 sentences: why these phases, how athlete notes shaped the plan>"
+    { "date": "YYYY-MM-DD", "title": "<≤4 words>", "desc": "<≤10 words>",
+      "type": "test"|"ramp_up"|"race"|"checkpoint"|"phase_end" }
+  ]
 }
 
-A session object looks like:
+Session object — keep ALL fields short:
 {
-  "slot":     "AM" | "PM" | "OPTIONAL" | "REST",
-  "type":     "rest" | "easy" | "hard" | "tempo" | "key" | "long" | "strength" | "swim" | "brick" | "test",
-  "title":    "<2-4 word label e.g. 'Z2 Ride', 'Long Run', 'VO2 Intervals', 'Strength · Lower'>",
-  "duration": "<e.g. '60 min', '90-120 min'>",
-  "summary":  "<single sentence — what + intensity + key targets, e.g. 'Zwift Z2 ride, 147-168W, HR <148bpm'>",
-  "sport":    "bike" | "run" | "swim" | "strength" | "brick" | "rest"
+  "slot": "AM"|"PM"|"OPTIONAL"|"REST",
+  "type": "rest"|"easy"|"hard"|"tempo"|"key"|"long"|"strength"|"swim"|"brick"|"test",
+  "title": "<≤3 words, e.g. 'Z2 Ride', 'VO2 Intervals'>",
+  "duration": "<e.g. '60min', '90-120min'>",
+  "summary": "<≤12 words, what + intensity + targets only>",
+  "sport": "bike"|"run"|"swim"|"strength"|"brick"|"rest"
 }
 
-CRITICAL RULES for daily session arrays:
-1. Each day MUST be an array. A rest day is [{ "slot": "REST", "type": "rest", "title": "Rest", "duration": "—", "summary": "Mandatory rest. Sleep 8h+.", "sport": "rest" }].
-2. AM and PM sessions are SEPARATE entries. NEVER combine "Strength + Bike" into one entry — emit two objects.
-3. A typical hard day with morning intervals + evening strength is two entries: AM key bike + PM strength.
-4. Use "OPTIONAL" slot for sessions the athlete can drop based on feel.
-5. Order entries chronologically (AM before PM).
+Hard rules:
+1. Each day is an array. Rest day: [{"slot":"REST","type":"rest","title":"Rest","duration":"—","summary":"Rest. Sleep 8h+.","sport":"rest"}].
+2. AM and PM are SEPARATE entries. Never combine.
+3. Phases cover today → race date with NO gaps. Sum of (weeks_to_end - weeks_from_start + 1) = total_weeks.
+4. End with a 1–2 week taper phase ending on race date.
+5. Phase count: 3-5 for plans <16 weeks, 5-7 for longer.
+6. Standard progression: Base → Build → Peak → Taper. If ACWR <0.7, front-load Rebuild.
+7. Respect athlete's weekly pattern (training days, AM/PM availability). 5-day pattern → 2 REST days.
+8. Athlete notes are load-bearing — holidays, secondary goals, constraints all shape templates.
+9. 4-6 milestones: phase ends, key tests, race simulation 4 weeks out, race day. Race day mandatory and last.
+10. CTL ramp ≤ 5/week.
 
-Plan-level rules:
-1. Phases must cover today → race date with no gaps. Sum of (weeks_to_end - weeks_from_start + 1) across phases = total_weeks.
-2. Always end with a 1–2 week taper phase ending on race date.
-3. Phase progression: typically Base → Build → Peak → Taper. Adjust to current CTL — if athlete is undertrained (ACWR <0.7), front-load with a Rebuild phase.
-4. Weekly templates: respect the athlete's weekly pattern. If they only train 5 days, two days must be REST.
-5. Athlete notes are LOAD-BEARING. Holidays trigger a maintenance phase or modified template. Secondary goals (body comp, strength) must appear in templates. Constraints (injuries) shape session selection.
-6. Include 4–8 milestones: phase ends, FTP/run tests at logical inflection points, race simulation 4 weeks out, race day.
-7. Race day milestone is mandatory and last.
-8. CTL targets should be progressive but realistic (ramp ≤5/week).
-
-Output ONLY the JSON object, no other text.`;
+Output ONLY the JSON object.`;
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
