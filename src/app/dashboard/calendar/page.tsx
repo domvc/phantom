@@ -232,8 +232,74 @@ function WeekRow({
   }, [monday, allPhases, phase]);
 
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const [dragHoverKey, setDragHoverKey] = useState<DayKey | null>(null);
+  const [dragSourceKey, setDragSourceKey] = useState<DayKey | null>(null);
 
   const dateLabel = monday.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  /**
+   * Resolve the effective sessions for a given day inside this week.
+   * Checks weekOverrides on the plan first, falls back to the phase template.
+   */
+  function effectiveDay(dayKey: DayKey, dayPhase: PlanPhase | null): PlannedSession[] {
+    const override = user.plan?.weekOverrides?.[weekStartIso]?.[dayKey];
+    if (override !== undefined) return normalizeDay(override);
+    return dayPhase
+      ? normalizeDay(dayPhase.weekly_template[dayKey as keyof typeof dayPhase.weekly_template])
+      : [];
+  }
+
+  /**
+   * Move a session within this week from one day to another. Writes a sparse
+   * weekOverride entry — the phase template stays untouched, only THIS week
+   * sees the change. Persists immediately.
+   */
+  function moveSessionWithinWeek(opts: {
+    fromKey: DayKey;
+    fromIdx: number;
+    toKey: DayKey;
+  }) {
+    const { fromKey, fromIdx, toKey } = opts;
+    if (fromKey === toKey) return;
+    if (!user.plan) return;
+
+    const fromDate = new Date(monday);
+    fromDate.setDate(monday.getDate() + DAY_KEYS.indexOf(fromKey));
+    const toDate = new Date(monday);
+    toDate.setDate(monday.getDate() + DAY_KEYS.indexOf(toKey));
+    const fromPhase = phaseForDate(allPhases, fromDate) || phase;
+    const toPhase = phaseForDate(allPhases, toDate) || phase;
+
+    const fromSessions = effectiveDay(fromKey, fromPhase);
+    const toSessions = effectiveDay(toKey, toPhase);
+
+    const moved = fromSessions[fromIdx];
+    if (!moved) return;
+    if (moved.type === "rest") return; // never drag a rest day around
+
+    const newFrom = fromSessions.filter((_, i) => i !== fromIdx);
+    const newTo = [...toSessions.filter((s) => s.type !== "rest"), moved];
+
+    const existingOverride = user.plan.weekOverrides?.[weekStartIso] ?? {};
+    const updatedOverride: Partial<typeof user.plan.phases[number]["weekly_template"]> = {
+      ...existingOverride,
+      [fromKey]: newFrom.length === 0
+        ? [{ slot: "REST", type: "rest", title: "Rest", duration: "—", summary: "Rest day (after move)", sport: "rest" }]
+        : newFrom,
+      [toKey]: newTo,
+    };
+
+    const updatedPlan: typeof user.plan = {
+      ...user.plan,
+      weekOverrides: {
+        ...(user.plan.weekOverrides ?? {}),
+        [weekStartIso]: updatedOverride,
+      },
+    };
+
+    setUserState({ plan: updatedPlan });
+    window.dispatchEvent(new Event("phantomcoach:plan-generated"));
+  }
 
   function handleCopy() {
     const text = weekToText({
@@ -330,24 +396,62 @@ function WeekRow({
             const dateIso = toLocalIso(date);
             const isToday = date.toDateString() === today.toDateString();
             const dayPhase = phaseForDate(allPhases, date) || phase;
-            const sessions: PlannedSession[] = dayPhase
-              ? normalizeDay(
-                  dayPhase.weekly_template[key as keyof typeof dayPhase.weekly_template]
-                )
-              : [
-                  {
-                    slot: "REST",
-                    type: "rest",
-                    title: "—",
-                    duration: "—",
-                    summary: "Outside plan",
-                    sport: "rest",
-                  },
-                ];
+            const fallback: PlannedSession = {
+              slot: "REST",
+              type: "rest",
+              title: "—",
+              duration: "—",
+              summary: "Outside plan",
+              sport: "rest",
+            };
+            const sessions: PlannedSession[] =
+              effectiveDay(key as DayKey, dayPhase).length > 0
+                ? effectiveDay(key as DayKey, dayPhase)
+                : dayPhase
+                ? [{ ...fallback, summary: "Rest" }]
+                : [fallback];
             const dayReconciliation = reconciliationForDate(user.reconciliations, dateIso);
+            const isDropTarget = dragHoverKey === key && dragSourceKey !== null && dragSourceKey !== key;
+            const isDragSource = dragSourceKey === key;
 
             return (
-              <div key={key} className="flex flex-col min-w-0">
+              <div
+                key={key}
+                className={`flex flex-col min-w-0 rounded-md transition ${
+                  isDropTarget ? "ring-2 ring-accent ring-offset-1 ring-offset-bg" : ""
+                } ${isDragSource ? "opacity-60" : ""}`}
+                onDragOver={(e) => {
+                  // Allow drop only if we're dragging something from a different day
+                  if (dragSourceKey && dragSourceKey !== key) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragHoverKey !== key) setDragHoverKey(key as DayKey);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragHoverKey === key) setDragHoverKey(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragHoverKey(null);
+                  try {
+                    const data = JSON.parse(e.dataTransfer.getData("application/json")) as {
+                      mondayIso: string;
+                      fromKey: DayKey;
+                      fromIdx: number;
+                    };
+                    if (data.mondayIso !== weekStartIso) return;
+                    moveSessionWithinWeek({
+                      fromKey: data.fromKey,
+                      fromIdx: data.fromIdx,
+                      toKey: key as DayKey,
+                    });
+                  } catch {
+                    /* malformed payload — ignore */
+                  }
+                  setDragSourceKey(null);
+                }}
+              >
                 <div
                   className={`text-center pb-2 border-b mb-2 ${
                     isToday ? "border-accent" : "border-border-soft"
@@ -384,6 +488,23 @@ function WeekRow({
                       key={idx}
                       session={s}
                       muted={Boolean(dayReconciliation)}
+                      draggable={s.type !== "rest" && !dayReconciliation}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          "application/json",
+                          JSON.stringify({
+                            mondayIso: weekStartIso,
+                            fromKey: key as DayKey,
+                            fromIdx: idx,
+                          })
+                        );
+                        e.dataTransfer.effectAllowed = "move";
+                        setDragSourceKey(key as DayKey);
+                      }}
+                      onDragEnd={() => {
+                        setDragSourceKey(null);
+                        setDragHoverKey(null);
+                      }}
                       onClick={() =>
                         s.type !== "rest" &&
                         onClickSession(
@@ -622,10 +743,16 @@ function SessionCard({
   session,
   onClick,
   muted = false,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
 }: {
   session: PlannedSession;
   onClick: () => void;
   muted?: boolean;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLButtonElement>) => void;
 }) {
   const palette = TYPE_STYLES[session.type] || TYPE_STYLES.easy;
   const isClickable = session.type !== "rest";
@@ -633,14 +760,23 @@ function SessionCard({
     <button
       onClick={onClick}
       disabled={!isClickable}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={`text-left rounded-md border px-2.5 py-2 transition ${palette.bg} ${palette.border} ${
         muted ? "opacity-40" : ""
       } ${
         isClickable && !muted
           ? "hover:shadow-sm hover:-translate-y-px hover:border-accent cursor-pointer"
           : "cursor-default"
-      }`}
-      title={muted ? "Plan was replaced by a logged activity for this day" : undefined}
+      } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
+      title={
+        muted
+          ? "Plan was replaced by a logged activity for this day"
+          : draggable
+          ? "Drag to a different day to move this session for this week"
+          : undefined
+      }
     >
       <div className="flex items-center gap-1.5 mb-0.5">
         {session.slot && session.slot !== "REST" && (

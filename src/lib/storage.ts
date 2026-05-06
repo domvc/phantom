@@ -155,6 +155,14 @@ export type PlanMilestone = {
   type: "test" | "ramp_up" | "race" | "checkpoint" | "phase_end";
 };
 
+/**
+ * Per-week overrides on top of phase templates. Keyed by Monday-of-week (YYYY-MM-DD,
+ * local). Sparse — days not present fall back to the phase template. Used by
+ * drag-drop in the calendar to move a session for a single week without
+ * mutating the phase-wide template.
+ */
+export type WeekOverrides = Record<string, Partial<WeeklyTemplate>>;
+
 export type Plan = {
   generated_at: string;
   race: { name: string; date: string; type: string };
@@ -162,6 +170,7 @@ export type Plan = {
   phases: PlanPhase[];
   milestones: PlanMilestone[];
   rationale?: string;
+  weekOverrides?: WeekOverrides;
 };
 
 export type PlanAmendment = {
