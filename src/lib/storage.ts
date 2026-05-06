@@ -10,6 +10,22 @@ export type IntervalsConnection = {
   connectedAt: string;
 };
 
+/**
+ * Lightweight summary of an active Strava connection. The actual OAuth tokens
+ * live server-side in the `strava_tokens` Supabase table — never on the client.
+ */
+export type StravaConnection = {
+  athleteId: number;
+  athleteName?: string;
+  connectedAt: string;
+};
+
+/**
+ * Which data source the app should sync from. Mutually exclusive — connecting
+ * one explicitly clears the other.
+ */
+export type DataSource = "intervals" | "strava";
+
 export type RaceType =
   | "5K"
   | "10K"
@@ -250,6 +266,9 @@ export type BodyMeasurement = {
 
 export type UserState = {
   intervals?: IntervalsConnection;
+  strava?: StravaConnection;
+  /** Which source the next sync should pull from. Mirrors whichever connection is set. */
+  dataSource?: DataSource;
   /** @deprecated read-only mirror of the next A-race in `races`. New code should use `races`. */
   raceGoal?: RaceGoal;
   /** Source of truth for race goals. First entry by date is the primary A-race. */

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   clearUserState,
   generateRaceId,
@@ -14,6 +14,16 @@ import {
   type UserState,
 } from "@/lib/storage";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+
+type StravaStatus =
+  | { phase: "loading" }
+  | { phase: "disconnected" }
+  | {
+      phase: "connected";
+      athleteName: string | null;
+      athleteId: number;
+      connectedAt: string;
+    };
 import {
   PulseIcon,
   SparkIcon,
@@ -25,16 +35,141 @@ import {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<UserState>({});
   const [notes, setNotes] = useState<AthleteNotes>({});
   const [notesDirty, setNotesDirty] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [strava, setStrava] = useState<StravaStatus>({ phase: "loading" });
+  const [stravaBusy, setStravaBusy] = useState(false);
+  const [stravaError, setStravaError] = useState<string | null>(null);
 
   useEffect(() => {
     const s = getUserState();
     setUser(s);
     setNotes(s.athleteNotes || {});
   }, []);
+
+  // Fetch Strava status (server-side row), runs on mount + after OAuth bounce-back.
+  const refreshStravaStatus = useCallback(async () => {
+    const sb = getSupabase();
+    if (!sb) {
+      setStrava({ phase: "disconnected" });
+      return;
+    }
+    const { data: sessionData } = await sb.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      setStrava({ phase: "disconnected" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/strava/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.connected) {
+        setStrava({
+          phase: "connected",
+          athleteName: json.athleteName ?? null,
+          athleteId: json.athleteId,
+          connectedAt: json.connectedAt,
+        });
+        // Mirror to local UserState so the rest of the app knows the source.
+        setUserState({
+          strava: {
+            athleteId: json.athleteId,
+            athleteName: json.athleteName ?? undefined,
+            connectedAt: json.connectedAt,
+          },
+          dataSource: "strava",
+          // Mutual exclusion: clear any existing Intervals.icu connection.
+          intervals: undefined,
+        });
+        setUser(getUserState());
+      } else {
+        setStrava({ phase: "disconnected" });
+      }
+    } catch {
+      setStrava({ phase: "disconnected" });
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshStravaStatus();
+  }, [refreshStravaStatus]);
+
+  // OAuth bounce-back handling — show success/error and re-fetch.
+  useEffect(() => {
+    const flag = searchParams.get("strava");
+    if (!flag) return;
+    if (flag === "connected") {
+      setStravaError(null);
+      void refreshStravaStatus();
+    } else if (flag === "error") {
+      const reason = searchParams.get("reason") || "unknown";
+      setStravaError(`Strava connection failed (${reason}). Please try again.`);
+    }
+    // Clean the params so refresh doesn't keep firing.
+    router.replace("/dashboard/settings");
+  }, [searchParams, refreshStravaStatus, router]);
+
+  async function connectStrava() {
+    setStravaError(null);
+    setStravaBusy(true);
+    try {
+      const sb = getSupabase();
+      if (!sb) {
+        setStravaError("You need to be signed in to connect Strava.");
+        return;
+      }
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        setStravaError("You need to be signed in to connect Strava.");
+        return;
+      }
+      const res = await fetch("/api/strava/connect", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.url) {
+        setStravaError(json.error || "Couldn't start Strava OAuth.");
+        return;
+      }
+      window.location.href = json.url;
+    } catch (e) {
+      setStravaError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setStravaBusy(false);
+    }
+  }
+
+  async function disconnectStrava() {
+    if (!confirm("Disconnect Strava? Activities will stop syncing.")) return;
+    setStravaBusy(true);
+    setStravaError(null);
+    try {
+      const sb = getSupabase();
+      if (!sb) return;
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
+      await fetch("/api/strava/disconnect", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Clear local mirror.
+      setUserState({ strava: undefined, dataSource: undefined });
+      setUser(getUserState());
+      setStrava({ phase: "disconnected" });
+    } catch (e) {
+      setStravaError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setStravaBusy(false);
+    }
+  }
 
   function patchNotes(p: Partial<AthleteNotes>) {
     setNotes((n) => ({ ...n, ...p }));
@@ -101,12 +236,13 @@ export default function SettingsPage() {
           meta="Server-side · key managed by MyGOAT"
           status="active"
         />
-        <ConnectionCard
-          icon={<MountainIcon size={18} className="text-text-muted" />}
-          name="Strava"
-          desc="Secondary activity source — coming soon"
-          meta="On the roadmap"
-          status={null}
+        <StravaConnectionCard
+          status={strava}
+          busy={stravaBusy}
+          hasIntervals={Boolean(user.intervals)}
+          onConnect={connectStrava}
+          onDisconnect={disconnectStrava}
+          error={stravaError}
         />
         <ConnectionCard
           icon={<LeafIcon size={18} className="text-text-muted" />}
@@ -262,6 +398,67 @@ function NoteField({
         className="w-full px-3 py-2.5 bg-bg border border-border rounded-md text-[13px] focus:outline-none focus:border-accent transition resize-none"
       />
     </label>
+  );
+}
+
+function StravaConnectionCard({
+  status,
+  busy,
+  hasIntervals,
+  onConnect,
+  onDisconnect,
+  error,
+}: {
+  status: StravaStatus;
+  busy: boolean;
+  hasIntervals: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  error: string | null;
+}) {
+  const connected = status.phase === "connected";
+  const meta =
+    status.phase === "loading"
+      ? "Checking connection…"
+      : status.phase === "connected"
+        ? `${status.athleteName || `Athlete #${status.athleteId}`} · connected ${new Date(
+            status.connectedAt
+          ).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+        : hasIntervals
+          ? "Connect to switch from Intervals.icu — only one source can be active."
+          : "Auto-syncs runs, rides, and swims via OAuth — no API key needed";
+
+  return (
+    <div className="bg-surface border border-border-soft rounded-md p-4 flex items-center gap-4">
+      <div className="size-10 rounded-md bg-bg border border-border-soft flex items-center justify-center flex-shrink-0">
+        <MountainIcon
+          size={18}
+          className={connected ? "text-accent" : "text-text-muted"}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-[13px] text-text">Strava</div>
+        <div className="text-[11.5px] text-text-muted">
+          Activity source — runs, rides, swims pulled directly from Strava
+        </div>
+        <div className="text-[11px] text-text-mid mt-1">{meta}</div>
+        {error && <div className="text-[11px] text-modify mt-1">⚠️ {error}</div>}
+      </div>
+      {status.phase !== "loading" && (
+        <button
+          type="button"
+          onClick={connected ? onDisconnect : onConnect}
+          disabled={busy}
+          className={`text-[11.5px] font-semibold px-3 py-1.5 rounded-md transition whitespace-nowrap disabled:opacity-50 ${
+            connected
+              ? "bg-bg border border-border hover:border-modify hover:text-modify"
+              : "bg-accent hover:bg-accent-h text-white"
+          }`}
+        >
+          {busy ? "…" : connected ? "Disconnect" : "Connect Strava"}
+        </button>
+      )}
+    </div>
   );
 }
 
