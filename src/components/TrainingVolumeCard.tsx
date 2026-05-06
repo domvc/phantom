@@ -238,87 +238,127 @@ function formatPrimary(value: number, unit: string): string {
   return value.toString();
 }
 
+/**
+ * Strava-style daily volume chart. Each day = one circle marker. Filled marker
+ * for days with activity, hollow for zeros. Hover any day → tooltip shows
+ * exact value + date with a vertical crosshair.
+ */
 function VolumeChart({ stats, sport }: { stats: VolumeStats; sport: VolumeSport }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
   const buckets = stats.buckets;
-  const max = Math.max(...buckets.map((b) => b.value), 1);
+  // Round max up to a nice axis number (5/10/20/50/100…)
+  const rawMax = Math.max(...buckets.map((b) => b.value), 1);
+  const max = niceCeil(rawMax);
   const granularity = stats.bucketGranularity;
 
-  // SVG chart sizing
+  // SVG sizing — taller, leaves room on the right for axis labels
   const width = 720;
-  const height = 140;
-  const padX = 8;
-  const padTop = 12;
-  const padBottom = 24;
-  const innerW = width - padX * 2;
+  const height = 200;
+  const padLeft = 12;
+  const padRight = 44; // axis labels live here
+  const padTop = 14;
+  const padBottom = 28;
+  const innerW = width - padLeft - padRight;
   const innerH = height - padTop - padBottom;
 
-  // Build polyline points + area path
+  // Build polyline points + area path (one per bucket)
   const points = buckets.map((b, i) => {
     const x =
       buckets.length === 1
-        ? padX + innerW / 2
-        : padX + (i / (buckets.length - 1)) * innerW;
+        ? padLeft + innerW / 2
+        : padLeft + (i / (buckets.length - 1)) * innerW;
     const y = padTop + innerH - (b.value / max) * innerH;
     return { x, y, b };
   });
 
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const linePath = points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+    .join(" ");
   const areaPath =
-    `M ${padX} ${padTop + innerH} ` +
-    points.map((p) => `L ${p.x} ${p.y}`).join(" ") +
-    ` L ${padX + innerW} ${padTop + innerH} Z`;
+    `M ${padLeft.toFixed(2)} ${(padTop + innerH).toFixed(2)} ` +
+    points.map((p) => `L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") +
+    ` L ${(padLeft + innerW).toFixed(2)} ${(padTop + innerH).toFixed(2)} Z`;
 
-  // X-axis labels — first, middle, last (avoid clutter)
+  // Y-axis ticks: 0, max*1/3, max*2/3, max (4 ticks total)
+  const yTicks = [0, max / 3, (max * 2) / 3, max];
+
+  // X-axis labels: 4 evenly spaced (or all if fewer than 4)
   const labelIndices =
-    buckets.length <= 3
+    buckets.length <= 4
       ? buckets.map((_, i) => i)
-      : [0, Math.floor(buckets.length / 2), buckets.length - 1];
+      : [
+          0,
+          Math.floor((buckets.length - 1) / 3),
+          Math.floor(((buckets.length - 1) * 2) / 3),
+          buckets.length - 1,
+        ];
 
   const axisUnit =
     sport === "strength" ? "" : sport === "all" ? "min" : "km";
+
+  // SVG mouse handlers — find the nearest bucket
+  function onMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const xPx = ((e.clientX - rect.left) / rect.width) * width;
+    if (xPx < padLeft || xPx > padLeft + innerW) {
+      setHoverIdx(null);
+      return;
+    }
+    // Map to bucket index
+    const ratio = (xPx - padLeft) / innerW;
+    const idx = Math.round(ratio * (buckets.length - 1));
+    setHoverIdx(Math.max(0, Math.min(buckets.length - 1, idx)));
+  }
+  function onMouseLeave() {
+    setHoverIdx(null);
+  }
+
+  const hoverPoint = hoverIdx != null ? points[hoverIdx] : null;
+  const hoverBucket = hoverIdx != null ? buckets[hoverIdx] : null;
 
   return (
     <div className="relative">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full"
+        className="w-full select-none"
         preserveAspectRatio="none"
-        aria-hidden
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
       >
         <defs>
           <linearGradient id="volume-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.3" />
+            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.32" />
             <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.04" />
           </linearGradient>
         </defs>
 
-        {/* Y-axis grid lines */}
-        <line
-          x1={padX}
-          y1={padTop}
-          x2={padX + innerW}
-          y2={padTop}
-          stroke="var(--color-border-soft)"
-          strokeDasharray="2 3"
-          strokeWidth={1}
-        />
-        <line
-          x1={padX}
-          y1={padTop + innerH / 2}
-          x2={padX + innerW}
-          y2={padTop + innerH / 2}
-          stroke="var(--color-border-soft)"
-          strokeDasharray="2 3"
-          strokeWidth={1}
-        />
-        <line
-          x1={padX}
-          y1={padTop + innerH}
-          x2={padX + innerW}
-          y2={padTop + innerH}
-          stroke="var(--color-border)"
-          strokeWidth={1}
-        />
+        {/* Y-axis gridlines + labels */}
+        {yTicks.map((tick, i) => {
+          const y = padTop + innerH - (tick / max) * innerH;
+          const isBaseline = i === 0;
+          return (
+            <g key={i}>
+              <line
+                x1={padLeft}
+                y1={y}
+                x2={padLeft + innerW}
+                y2={y}
+                stroke={isBaseline ? "var(--color-border)" : "var(--color-border-soft)"}
+                strokeDasharray={isBaseline ? "" : "2 3"}
+                strokeWidth={1}
+              />
+              <text
+                x={padLeft + innerW + 6}
+                y={y + 3}
+                className="fill-text-muted"
+                style={{ fontSize: 11 }}
+              >
+                {formatAxisValue(tick, axisUnit)}
+              </text>
+            </g>
+          );
+        })}
 
         {/* Area + line */}
         <path d={areaPath} fill="url(#volume-fill)" />
@@ -331,37 +371,47 @@ function VolumeChart({ stats, sport }: { stats: VolumeStats; sport: VolumeSport 
           strokeLinejoin="round"
         />
 
-        {/* Dots — only for sparse data */}
-        {buckets.length <= 14 &&
-          points.map((p, i) => (
-            <circle
-              key={i}
-              cx={p.x}
-              cy={p.y}
-              r={p.b.value > 0 ? 3 : 2}
-              fill={p.b.value > 0 ? "var(--color-accent)" : "var(--color-border)"}
-            />
-          ))}
+        {/* Day circles — filled when activity, hollow when zero */}
+        {buckets.length <= 95 &&
+          points.map((p, i) => {
+            const hasValue = p.b.value > 0;
+            const isHovered = hoverIdx === i;
+            return (
+              <circle
+                key={i}
+                cx={p.x}
+                cy={p.y}
+                r={isHovered ? 4 : hasValue ? 3 : 1.6}
+                fill={hasValue ? "var(--color-accent)" : "var(--color-bg)"}
+                stroke="var(--color-accent)"
+                strokeWidth={hasValue ? 0 : 1.4}
+              />
+            );
+          })}
 
-        {/* Y-axis labels */}
-        <text
-          x={padX + innerW - 2}
-          y={padTop + 4}
-          textAnchor="end"
-          className="text-[9px] fill-text-muted"
-          style={{ fontSize: 10 }}
-        >
-          {formatAxisValue(max, axisUnit)}
-        </text>
-        <text
-          x={padX + innerW - 2}
-          y={padTop + innerH + 4}
-          textAnchor="end"
-          className="fill-text-muted"
-          style={{ fontSize: 10 }}
-        >
-          0
-        </text>
+        {/* Crosshair + emphasized point on hover */}
+        {hoverPoint && hoverBucket && (
+          <g pointerEvents="none">
+            <line
+              x1={hoverPoint.x}
+              y1={padTop}
+              x2={hoverPoint.x}
+              y2={padTop + innerH}
+              stroke="var(--color-accent)"
+              strokeWidth={1}
+              strokeDasharray="2 2"
+              opacity={0.55}
+            />
+            <circle
+              cx={hoverPoint.x}
+              cy={hoverPoint.y}
+              r={5}
+              fill="var(--color-accent)"
+              stroke="var(--color-bg)"
+              strokeWidth={2}
+            />
+          </g>
+        )}
 
         {/* X-axis labels */}
         {labelIndices.map((idx) => {
@@ -371,33 +421,52 @@ function VolumeChart({ stats, sport }: { stats: VolumeStats; sport: VolumeSport 
             <text
               key={idx}
               x={p.x}
-              y={height - 6}
+              y={height - 8}
               textAnchor="middle"
               className="fill-text-muted"
-              style={{ fontSize: 10, letterSpacing: "0.05em" }}
+              style={{ fontSize: 11, letterSpacing: "0.04em" }}
             >
-              {p.b.label}
+              {formatTickLabel(p.b.startDate)}
             </text>
           );
         })}
       </svg>
 
-      {/* Hover tooltips — invisible touch zones with native title attribute */}
-      <div className="absolute inset-0 flex pointer-events-none" style={{ paddingLeft: padX, paddingRight: padX }}>
-        {buckets.map((b, i) => {
-          const flexW = 1;
-          return (
-            <div
-              key={i}
-              className="pointer-events-auto"
-              style={{ flex: flexW }}
-              title={`${b.label}${granularity === "week" ? " (week of)" : ""}\n${b.value} ${axisUnit || "sessions"}\n${b.sessions} session${b.sessions === 1 ? "" : "s"}\n${Math.round(b.minutes)} min`}
-            />
-          );
-        })}
-      </div>
+      {/* Floating tooltip (HTML, follows hovered point) */}
+      {hoverPoint && hoverBucket && (
+        <div
+          className="absolute pointer-events-none -translate-x-1/2 -translate-y-full bg-text text-bg rounded-md px-2.5 py-1.5 text-[11.5px] shadow-lg whitespace-nowrap z-10"
+          style={{
+            left: `${(hoverPoint.x / width) * 100}%`,
+            top: `${(hoverPoint.y / height) * 100}%`,
+            marginTop: "-10px",
+          }}
+        >
+          <div className="font-bold">
+            {formatTooltipValue(hoverBucket.value, axisUnit)}
+          </div>
+          <div className="opacity-65">
+            {formatTooltipDate(hoverBucket.startDate, granularity)}
+            {hoverBucket.sessions > 0 && ` · ${hoverBucket.sessions} session${hoverBucket.sessions === 1 ? "" : "s"}`}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+/** Round up to a tidy axis maximum: 5, 10, 20, 50, 100, 200, 500… */
+function niceCeil(v: number): number {
+  if (v <= 0) return 1;
+  const exp = Math.floor(Math.log10(v));
+  const base = Math.pow(10, exp);
+  const m = v / base;
+  let n: number;
+  if (m <= 1) n = 1;
+  else if (m <= 2) n = 2;
+  else if (m <= 5) n = 5;
+  else n = 10;
+  return n * base;
 }
 
 function formatAxisValue(v: number, unit: string): string {
@@ -409,7 +478,39 @@ function formatAxisValue(v: number, unit: string): string {
     return `${Math.round(v)}m`;
   }
   if (unit === "km") {
-    return v >= 100 ? `${Math.round(v)}` : v.toFixed(1);
+    if (v >= 100) return `${Math.round(v)} km`;
+    return `${v.toFixed(v < 10 ? 1 : 0)} km`;
   }
   return Math.round(v).toString();
+}
+
+function formatTickLabel(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }).toUpperCase();
+}
+
+function formatTooltipValue(v: number, unit: string): string {
+  if (unit === "min") {
+    if (v >= 60) {
+      const h = Math.floor(v / 60);
+      const m = Math.round(v % 60);
+      return m === 0 ? `${h}h` : `${h}h ${m}m`;
+    }
+    return v === 0 ? "Rest" : `${Math.round(v)} min`;
+  }
+  if (unit === "km") {
+    return v === 0 ? "Rest" : `${v.toFixed(v < 10 ? 2 : 1)} km`;
+  }
+  return v === 0 ? "0" : `${v} session${v === 1 ? "" : "s"}`;
+}
+
+function formatTooltipDate(iso: string, granularity: "day" | "week"): string {
+  const d = new Date(iso + "T00:00:00");
+  const label = d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return granularity === "week" ? `Week of ${label}` : label;
 }

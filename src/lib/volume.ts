@@ -192,10 +192,14 @@ function bucketize(
   return buckets;
 }
 
-/** Choose chart granularity based on range length. */
+/**
+ * Choose chart granularity. Daily for everything up to 30 days (matches Strava's
+ * 1M view — one peak per session, easy to read). Weekly for 90 days to avoid
+ * 90 cramped dots in a narrow chart.
+ */
 function chooseGranularity(range: VolumeRange): "day" | "week" {
-  if (range === "this_week" || range === "last_7") return "day";
-  return "week";
+  if (range === "last_90") return "week";
+  return "day";
 }
 
 function sum(arr: number[]): number {
