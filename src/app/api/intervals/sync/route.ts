@@ -50,8 +50,6 @@ export async function POST(req: NextRequest) {
   const today = new Date();
   const ninetyDaysAgo = new Date(today);
   ninetyDaysAgo.setDate(today.getDate() - 90);
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(today.getDate() - 30);
 
   try {
     const [athleteRes, wellnessRes, activitiesRes] = await Promise.all([
@@ -60,7 +58,9 @@ export async function POST(req: NextRequest) {
         headers,
         cache: "no-store",
       }),
-      fetch(`${base}/activities?oldest=${isoDate(thirtyDaysAgo)}&newest=${isoDate(today)}`, {
+      // Fetch the same 90-day window for activities so the volume chart can
+      // show "Last 90 days". Earlier this was 30 days / 10 results — too narrow.
+      fetch(`${base}/activities?oldest=${isoDate(ninetyDaysAgo)}&newest=${isoDate(today)}`, {
         headers,
         cache: "no-store",
       }),
@@ -158,10 +158,11 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // Recent activities — keep last 10, slim fields
+    // Recent activities — keep up to 200 entries from the 90-day window so
+    // the volume widget can chart "Last 90 days" without re-fetching.
     const recent = activities
       .sort((a, b) => b.start_date_local.localeCompare(a.start_date_local))
-      .slice(0, 10)
+      .slice(0, 200)
       .map((a) => ({
         id: a.id,
         date: a.start_date_local.slice(0, 10),

@@ -20,6 +20,7 @@ import MetricChip from "@/components/MetricChip";
 import SessionFeedbackModal from "@/components/SessionFeedbackModal";
 import NutritionCard from "@/components/NutritionCard";
 import SessionReconcileBanner from "@/components/SessionReconcileBanner";
+import TrainingVolumeCard from "@/components/TrainingVolumeCard";
 
 const METRIC_DEFINITIONS = {
   ctl: "Chronic Training Load — your fitness, calculated as a 42-day exponentially-weighted average of training stress (TSS). Higher = fitter. Most endurance athletes target a CTL that scales with their goal.",
@@ -157,6 +158,9 @@ export default function DashboardHome() {
 
           {/* Metric strip with hover popovers */}
           {synced && <MetricStrip synced={synced} />}
+
+          {/* Training volume — Strava-style with sport + range filters */}
+          <TrainingVolumeCard activities={synced?.recent_activities} />
 
           {/* Plan banner */}
           <PlanBanner
