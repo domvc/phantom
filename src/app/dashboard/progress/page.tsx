@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { getUserState, type UserState } from "@/lib/storage";
+import {
+  FlagIcon,
+  CheckIcon,
+  PulseIcon,
+  MountainIcon,
+  DotIcon,
+} from "@/components/icons";
 
 export default function ProgressPage() {
   const [user, setUser] = useState<UserState>({});
@@ -28,7 +35,9 @@ export default function ProgressPage() {
 
       {!plan?.milestones?.length ? (
         <div className="bg-accent-soft border border-accent-mid rounded-md p-8 text-center">
-          <div className="text-3xl mb-3">🏁</div>
+          <div className="size-12 rounded-full bg-bg border border-accent-mid flex items-center justify-center mx-auto mb-3">
+            <FlagIcon size={20} className="text-accent" />
+          </div>
           <div className="text-[14px] font-bold text-accent mb-1">
             No milestones yet
           </div>
@@ -53,7 +62,7 @@ export default function ProgressPage() {
               return (
                 <div key={`${m.date}-${i}`} className="flex gap-4 items-start relative">
                   <div
-                    className={`size-12 rounded-full flex items-center justify-center text-[18px] flex-shrink-0 z-10 ${
+                    className={`size-12 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${
                       isRace
                         ? "bg-accent text-white"
                         : isPast
@@ -63,7 +72,7 @@ export default function ProgressPage() {
                         : "bg-surface border border-border-soft text-text-muted"
                     }`}
                   >
-                    {iconFor(m.type)}
+                    <MilestoneIcon type={m.type} />
                   </div>
                   <div className="flex-1 min-w-0 bg-surface border border-border-soft rounded-md p-4">
                     <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -101,14 +110,20 @@ export default function ProgressPage() {
   );
 }
 
-function iconFor(type: string) {
+function MilestoneIcon({ type }: { type: string }) {
   switch (type) {
-    case "race": return "🏁";
-    case "test": return "📊";
-    case "ramp_up": return "📈";
-    case "phase_end": return "✓";
-    case "checkpoint": return "📍";
-    default: return "•";
+    case "race":
+      return <FlagIcon size={18} />;
+    case "test":
+      return <PulseIcon size={18} />;
+    case "ramp_up":
+      return <MountainIcon size={18} />;
+    case "phase_end":
+      return <CheckIcon size={16} />;
+    case "checkpoint":
+      return <DotIcon size={10} />;
+    default:
+      return <DotIcon size={8} />;
   }
 }
 

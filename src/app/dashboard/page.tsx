@@ -691,7 +691,12 @@ function PlanBanner({
   if (!plan) {
     return (
       <div className="bg-accent-soft border border-accent-mid rounded-md p-5 mb-5 flex items-start gap-4">
-        <div className="text-2xl pt-0.5">📋</div>
+        <div className="size-9 rounded-md bg-bg border border-accent-mid flex items-center justify-center flex-shrink-0 mt-0.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="text-accent" aria-hidden>
+            <path d="M9 11 H15 M9 15 H13 M9 7 H15" />
+            <rect x="5" y="3" width="14" height="18" rx="2" />
+          </svg>
+        </div>
         <div className="flex-1">
           <div className="font-bold text-[14px] text-accent">
             Generate your training plan
