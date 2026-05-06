@@ -7,6 +7,19 @@
  */
 import type { PlannedSession } from "./storage";
 
+/**
+ * Format a Date as YYYY-MM-DD using LOCAL calendar fields. Use this anywhere
+ * you'd otherwise reach for `d.toISOString().slice(0,10)` on a Date that
+ * represents a local moment (e.g. midnight of a calendar day) — toISOString
+ * converts to UTC and silently shifts the date in non-UTC timezones.
+ */
+export function toLocalIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export const DAY_KEYS = [
   "monday",
   "tuesday",
@@ -102,7 +115,7 @@ export function weekToCsv(opts: {
   DAY_KEYS.forEach((key, i) => {
     const date = new Date(monday);
     date.setDate(monday.getDate() + i);
-    const dateIso = date.toISOString().slice(0, 10);
+    const dateIso = toLocalIso(date);
     const dayLabel = DAY_LABELS[key];
     const sessions = weekly_template[key] ?? [];
     if (sessions.length === 0) {

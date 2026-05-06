@@ -11,7 +11,7 @@ import {
   type SessionReconciliation,
 } from "@/lib/storage";
 import { computeNutritionTargets } from "@/lib/nutrition";
-import { weekToText, weekToCsv, copyToClipboard, type DayKey } from "@/lib/exports";
+import { weekToText, weekToCsv, copyToClipboard, toLocalIso, type DayKey } from "@/lib/exports";
 import { downloadFile, safeFilename } from "@/lib/pwx";
 import { reconciliationForDate } from "@/lib/reconcile";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";
@@ -210,7 +210,7 @@ function WeekRow({
   const phaseWeekNum = phase
     ? Math.floor((monday.getTime() - new Date(phase.start_date).getTime()) / (7 * 86400000)) + 1
     : null;
-  const weekStartIso = monday.toISOString().slice(0, 10);
+  const weekStartIso = toLocalIso(monday);
   const weekContext = isCurrent
     ? `This week (${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})`
     : `Week of ${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
@@ -252,7 +252,7 @@ function WeekRow({
 
   function handleCsv() {
     const csv = weekToCsv({ monday, weekly_template: weekTemplate });
-    const filename = safeFilename(`week-${monday.toISOString().slice(0, 10)}`, "csv");
+    const filename = safeFilename(`week-${toLocalIso(monday)}`, "csv");
     downloadFile(filename, csv, "text/csv");
   }
 
@@ -327,7 +327,7 @@ function WeekRow({
           {DAY_KEYS.map((key, i) => {
             const date = new Date(monday);
             date.setDate(monday.getDate() + i);
-            const dateIso = date.toISOString().slice(0, 10);
+            const dateIso = toLocalIso(date);
             const isToday = date.toDateString() === today.toDateString();
             const dayPhase = phaseForDate(allPhases, date) || phase;
             const sessions: PlannedSession[] = dayPhase
@@ -389,7 +389,7 @@ function WeekRow({
                         onClickSession(
                           s,
                           DAY_ABBR[i],
-                          date.toISOString().slice(0, 10),
+                          toLocalIso(date),
                           dayPhase
                         )
                       }

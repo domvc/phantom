@@ -10,11 +10,11 @@ import {
   type IntervalsConnection,
   type RaceGoal,
   type AthleteNotes,
-  type Plan,
   type TrainingPrefs,
   type SportPref,
 } from "@/lib/storage";
 import { useCloudSync } from "@/lib/useCloudSync";
+import { generatePlanFromState } from "@/lib/planGen";
 import {
   PhantomLogo,
   GarminWordmark,
@@ -1240,94 +1240,15 @@ function PlanStep({
     setError(null);
     setElapsed(0);
 
-    try {
-      const s = getUserState();
-      const res = await fetch("/api/plan/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          synced: s.synced,
-          raceGoal: s.raceGoal,
-          trainingPrefs: s.trainingPrefs,
-          athleteNotes: s.athleteNotes,
-          amendments: s.amendments,
-          sessionFeedbacks: s.sessionFeedbacks,
-        }),
-      });
-
-      if (!res.ok || !res.body) {
-        setError(`Plan generation failed (HTTP ${res.status})`);
-        setPhase("error");
-        return;
-      }
-
-      // Read streamed text body
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let raw = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        raw += decoder.decode(value, { stream: true });
-      }
-      raw += decoder.decode();
-
-      const errMarker = raw.indexOf("__STREAM_ERROR__:");
-      if (errMarker !== -1) {
-        setError(raw.slice(errMarker + "__STREAM_ERROR__:".length).trim() || "Stream error");
-        setPhase("error");
-        return;
-      }
-
-      const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
-      let parsed: {
-        total_weeks?: number;
-        phases?: Plan["phases"];
-        milestones?: Plan["milestones"];
-        rationale?: string;
-      };
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch (e) {
-        setError(`Plan JSON parse failed: ${e instanceof Error ? e.message : "unknown"}`);
-        setPhase("error");
-        return;
-      }
-
-      const raceGoal = s.raceGoal;
-      if (!raceGoal) {
-        setError("Race goal missing");
-        setPhase("error");
-        return;
-      }
-
-      const today = new Date();
-      const race = new Date(raceGoal.date);
-      const totalWeeks = Math.max(
-        1,
-        Math.ceil((race.getTime() - today.getTime()) / (7 * 86_400_000))
-      );
-
-      const plan = {
-        generated_at: new Date().toISOString(),
-        race: {
-          name: raceGoal.name,
-          date: raceGoal.date,
-          type: raceGoal.type,
-        },
-        total_weeks: parsed.total_weeks ?? totalWeeks,
-        phases: parsed.phases ?? [],
-        milestones: parsed.milestones ?? [],
-        rationale: parsed.rationale,
-      };
-
-      setUserState({ plan, weeklyBriefs: {} });
-      setPhase("done");
-      window.dispatchEvent(new Event("phantomcoach:plan-generated"));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Network error");
+    const result = await generatePlanFromState();
+    if (!result.ok) {
+      setError(result.error);
       setPhase("error");
+      return;
     }
+    setUserState({ plan: result.plan, weeklyBriefs: {} });
+    setPhase("done");
+    window.dispatchEvent(new Event("phantomcoach:plan-generated"));
   }
 
   const remaining = Math.max(0, ESTIMATED_PLAN_SECONDS - elapsed);

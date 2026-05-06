@@ -13,6 +13,7 @@ import {
   type SessionReconciliation,
 } from "@/lib/storage";
 import { reconciliationForDate } from "@/lib/reconcile";
+import { generatePlanFromState } from "@/lib/planGen";
 import PerfChart from "@/components/PerfChart";
 import CoachChat from "@/components/CoachChat";
 import MetricChip from "@/components/MetricChip";
@@ -59,38 +60,18 @@ export default function DashboardHome() {
   }, []);
 
   async function generatePlan() {
-    const s = getUserState();
-    if (!s.raceGoal) {
-      setPlanError("Set your race goal first.");
-      return;
-    }
     setPlanState("generating");
     setPlanError(null);
-    try {
-      const res = await fetch("/api/plan/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          synced: s.synced,
-          raceGoal: s.raceGoal,
-          athleteNotes: s.athleteNotes,
-          amendments: s.amendments,
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) {
-        setPlanError(data.error || "Plan generation failed");
-        setPlanState("error");
-        return;
-      }
-      setUserState({ plan: data.plan, weeklyBriefs: {} });
-      setUser(getUserState());
-      window.dispatchEvent(new Event("phantomcoach:plan-generated"));
-      setPlanState("idle");
-    } catch (e) {
-      setPlanError(e instanceof Error ? e.message : "Network error");
+    const result = await generatePlanFromState();
+    if (!result.ok) {
+      setPlanError(result.error);
       setPlanState("error");
+      return;
     }
+    setUserState({ plan: result.plan, weeklyBriefs: {} });
+    setUser(getUserState());
+    window.dispatchEvent(new Event("phantomcoach:plan-generated"));
+    setPlanState("idle");
   }
 
   const synced = user.synced;
