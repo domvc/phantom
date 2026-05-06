@@ -129,16 +129,15 @@ function Hero() {
               <span className="block text-accent">like never before.</span>
             </h1>
 
-            <p className="mt-7 sm:mt-9 text-[16.5px] sm:text-xl text-white/85 leading-relaxed max-w-xl">
-              <span className="text-white font-semibold">
-                Connect your data. Set your goal. Get the plan that gets you
-                there.
-              </span>{" "}
-              Every published sport-science paper. Every elite coaching
-              framework on the planet. Read by the world&apos;s most capable AI
-              and applied to the live signal from your watch — watts,
-              kilometres, heart-rate, recovery. Real-time feedback. Dynamic
-              workouts. The plan reshapes the moment your data does.
+            <p className="mt-7 sm:mt-9 text-[18px] sm:text-2xl text-white font-semibold leading-snug max-w-xl tracking-tight">
+              Connect your data. Set your goal. Get the plan that gets you
+              there.
+            </p>
+
+            <p className="mt-4 sm:mt-5 text-[14.5px] sm:text-[16px] text-white/75 leading-relaxed max-w-xl">
+              Every published paper, every elite framework — applied to your
+              data by the world&apos;s most capable AI. Real-time feedback.
+              Dynamic workouts. The plan reshapes the moment your data does.
             </p>
 
             <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -692,14 +691,13 @@ function WhatsInside() {
               <br />
               <span className="text-accent">A coaching system.</span>
             </h2>
-            <p className="text-[14.5px] text-text-mid leading-relaxed mb-5">
-              Years of curation, layered into one brain. Phantomcoach knows
-              what&apos;s been proven — then reads your data and applies it.
+            <p className="text-[14.5px] text-text-mid leading-relaxed mb-4">
+              Five layers of curation, applied to your data by the world&apos;s
+              most capable AI.
             </p>
             <p className="text-[13px] text-text-muted leading-relaxed">
-              The result: coaching that doesn&apos;t guess. Decisions that hold up
-              to scrutiny. Plans that reshape when life shifts. Output an elite
-              coach would sign off on.
+              Decisions that hold up to scrutiny. Plans that reshape when life
+              shifts. Output an elite coach would sign off on.
             </p>
           </div>
 
@@ -830,9 +828,9 @@ function FinalCTA() {
             Yours, every morning.
           </h2>
           <p className="mt-7 text-[15px] sm:text-[16.5px] text-white/75 leading-relaxed max-w-xl mx-auto">
-            The coaching elites pay thousands for — read by the world&apos;s most
-            capable AI, applied to your data, recalibrated daily. You can train
-            without it. The athletes who win don&apos;t.
+            Read by the world&apos;s most capable AI, applied to your data,
+            recalibrated daily. You can train without it. The athletes who win
+            don&apos;t.
           </p>
         </div>
 
