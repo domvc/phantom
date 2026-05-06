@@ -198,13 +198,13 @@ function Welcome({ onNext }: { onNext: () => void }) {
     <div>
       <div className="text-center">
         <div className="text-[11px] uppercase tracking-[0.12em] text-accent font-semibold mb-3">
-          Welcome to Phantomcoach
+          Welcome to MyGOAT
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
           Five steps. Under five minutes.
         </h1>
         <p className="text-text-mid text-[14px] leading-relaxed max-w-md mx-auto">
-          Connect your data. Set your race. Answer a few questions. Phantomcoach
+          Connect your data. Set your race. Answer a few questions. MyGOAT
           builds the plan.
         </p>
       </div>

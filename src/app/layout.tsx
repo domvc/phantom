@@ -10,9 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Phantomcoach — Elite AI coaching, for the price of a coffee",
+  title: "MyGOAT — Elite AI coaching for endurance athletes",
   description:
-    "Run, bike, swim, strength & mobility — one programme, calibrated to your timeline. Sync from Garmin, Strava, or Intervals.icu. Powered by Claude. £5/month.",
+    "Run, bike, swim, strength & mobility — one programme, calibrated to your timeline. Sync from Garmin, Strava, or Intervals.icu. Powered by Claude.",
 };
 
 export default function RootLayout({

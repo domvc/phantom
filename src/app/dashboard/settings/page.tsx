@@ -98,7 +98,7 @@ export default function SettingsPage() {
           icon={<SparkIcon size={18} className="text-accent" />}
           name="Anthropic Claude AI"
           desc="Powers your personal coaching assistant"
-          meta="Server-side · key managed by Phantomcoach"
+          meta="Server-side · key managed by MyGOAT"
           status="active"
         />
         <ConnectionCard

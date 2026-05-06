@@ -148,10 +148,10 @@ export function sessionToPwx(opts: {
   const totalSec = steps.reduce((acc, s) => acc + Math.max(1, Math.round(s.duration_s)), 0);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<pwx xmlns="http://www.peaksware.com/PWX/1/0" creator="phantomcoach" version="1.0">
+<pwx xmlns="http://www.peaksware.com/PWX/1/0" creator="MyGOAT" version="1.0">
   <workout>
     <athlete>
-      <name>Phantomcoach Athlete</name>
+      <name>MyGOAT Athlete</name>
     </athlete>
     <sportType>${sport}</sportType>
     <code>${title}</code>

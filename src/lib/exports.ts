@@ -55,7 +55,7 @@ export function weekToText(opts: {
   const { monday, weekly_template, phaseName, raceName } = opts;
 
   const header = [
-    `Phantomcoach — Week of ${monday.toLocaleDateString("en-GB", {
+    `MyGOAT — Week of ${monday.toLocaleDateString("en-GB", {
       weekday: "long",
       day: "numeric",
       month: "long",

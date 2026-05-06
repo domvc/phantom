@@ -617,7 +617,7 @@ function Sports() {
             <span className="text-accent">One programme.</span>
           </h2>
           <p className="mt-5 text-[14px] sm:text-[15px] text-text-mid leading-relaxed max-w-xl">
-            Most apps specialise in one thing. Phantomcoach reads your week as
+            Most apps specialise in one thing. MyGOAT reads your week as
             integrated load — running, cycling, swimming, strength, mobility —
             sequenced so each session multiplies the next.
           </p>
@@ -752,7 +752,7 @@ function HowItWorks() {
     {
       n: "04",
       title: "Train with intent",
-      body: "Open Phantomcoach each morning. Read the call. Train the session. Ask anything. The plan adapts as your data does.",
+      body: "Open MyGOAT each morning. Read the call. Train the session. Ask anything. The plan adapts as your data does.",
     },
   ];
   return (
@@ -863,7 +863,7 @@ function FinalCTA() {
 function FAQ() {
   const qs = [
     {
-      q: "Which sports does Phantomcoach handle?",
+      q: "Which sports does MyGOAT handle?",
       a: "Run, bike, swim, strength & conditioning, mobility — one coach, one programme, sequenced together. 5K to Ironman, marathon PB to body composition target. The coaching brain plans them all.",
     },
     {
@@ -872,7 +872,7 @@ function FAQ() {
     },
     {
       q: "What data sources do you support?",
-      a: "Garmin, Strava, and Intervals.icu at launch. Phantomcoach reads activities, training-load metrics, sleep, HRV, weight — refreshes on demand. Apple Health and Wahoo are next on the list.",
+      a: "Garmin, Strava, and Intervals.icu at launch. MyGOAT reads activities, training-load metrics, sleep, HRV, weight — refreshes on demand. Apple Health and Wahoo are next on the list.",
     },
     {
       q: "Where does the science come from?",
@@ -888,7 +888,7 @@ function FAQ() {
     },
     {
       q: "How is this different from TrainerRoad, Final Surge, or other plan apps?",
-      a: "Most apps give you a structured library — pick a plan, follow it. Phantomcoach builds your plan from scratch using your training data, your race goal, your athlete notes, and your feedback after every session. Coaching, not a library.",
+      a: "Most apps give you a structured library — pick a plan, follow it. MyGOAT builds your plan from scratch using your training data, your race goal, your athlete notes, and your feedback after every session. Coaching, not a library.",
     },
     {
       q: "Does this replace a human coach?",
@@ -896,7 +896,7 @@ function FAQ() {
     },
     {
       q: "Where does my data go?",
-      a: "Connections are encrypted at rest. Phantomcoach reads on demand, sends relevant slices to Anthropic for coaching responses, and stores the latest snapshot for fast loads. Delete your account and it's gone. No archives. No resale.",
+      a: "Connections are encrypted at rest. MyGOAT reads on demand, sends relevant slices to Anthropic for coaching responses, and stores the latest snapshot for fast loads. Delete your account and it's gone. No archives. No resale.",
     },
   ];
   return (
@@ -940,13 +940,13 @@ function Footer() {
             <PhantomLogo size={18} />
           </div>
           <div className="text-[11px] text-white/40 mt-1.5">
-            © 2026 Phantomcoach · Built by athletes · Powered by Claude
+            © 2026 MyGOAT · Built by athletes · Powered by Claude
           </div>
         </div>
         <div className="flex gap-5 text-[12px] text-white/50">
           <a href="#" className="hover:text-white transition">Privacy</a>
           <a href="#" className="hover:text-white transition">Terms</a>
-          <a href="mailto:hello@phantomcoach.app" className="hover:text-white transition">
+          <a href="mailto:hello@mygoat.coach" className="hover:text-white transition">
             Contact
           </a>
         </div>

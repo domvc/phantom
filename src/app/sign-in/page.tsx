@@ -66,14 +66,14 @@ export default function SignIn() {
     <main className="flex flex-1 items-center justify-center px-6 py-20">
       <div className="w-full max-w-sm">
         <Link href="/" className="font-bold tracking-tight text-[15px] block text-center mb-10">
-          phantom<span className="text-accent">coach</span>
+          <span className="font-medium">my</span><span className="font-black tracking-[-0.02em] text-accent">GOAT</span>
         </Link>
         <div className="bg-surface border border-border-soft rounded-lg p-8">
           <h1 className="text-2xl font-bold tracking-tight mb-1">Welcome back</h1>
           <p className="text-[13px] text-text-muted mb-7">
             {configured
               ? "We'll email you a magic link. Click it and you're in — no password to remember."
-              : "Sign in to your Phantomcoach account."}
+              : "Sign in to your MyGOAT account."}
           </p>
 
           {configured ? (

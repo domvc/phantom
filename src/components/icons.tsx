@@ -17,30 +17,75 @@ const baseProps = (size: number, className: string) => ({
 
 /* ─── Brand ──────────────────────────────────────────────────── */
 
-export function PhantomMark({ size = 22, className = "" }: IconProps) {
+/**
+ * GoatMark — the punk-goat mascot with shades.
+ *
+ * Front-on stylised goat head: curled horns, big rectangular shades dominating
+ * the face, slight snarl line at the muzzle, and the signature goatee. Drawn
+ * in the same 24x24 line-icon vocabulary as the rest of the icon set so it
+ * scales clean from 16px (favicon) to 64px+ (hero glyph).
+ *
+ * The shades are a filled bar (uses currentColor) — that single block of
+ * solid colour is what the eye reads first, even at 16px. The horns + goatee
+ * fill in the "goat" read above ~24px.
+ */
+export function GoatMark({ size = 22, className = "" }: IconProps) {
   return (
-    <svg {...baseProps(size, className)} strokeWidth={1.6}>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M6.5 14 L9.5 11 L13 12.6 L17.5 7" strokeWidth={1.9} />
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={1.5}
+      className={className}
+      aria-hidden
+    >
+      {/* Curled left horn */}
+      <path d="M8.5 7 C 6.5 5, 5 3, 6 1.5 C 7 3, 8 5, 9 7" strokeWidth={1.6} />
+      {/* Curled right horn */}
+      <path d="M15.5 7 C 17.5 5, 19 3, 18 1.5 C 17 3, 16 5, 15 7" strokeWidth={1.6} />
+      {/* Head outline (rounded snout) */}
+      <path d="M8 7 C 7 11, 7 15, 9 18 C 10.5 19.5, 13.5 19.5, 15 18 C 17 15, 17 11, 16 7" />
+      {/* Big shades — solid bar with bridge */}
+      <rect x="7.4" y="9.5" width="3.6" height="3" rx="0.7" fill="currentColor" stroke="none" />
+      <rect x="13" y="9.5" width="3.6" height="3" rx="0.7" fill="currentColor" stroke="none" />
+      <line x1="11" y1="11" x2="13" y2="11" strokeWidth={1.2} />
+      {/* Snarl line + nostril */}
+      <path d="M10.5 16 L13.5 16" strokeWidth={1.3} />
+      {/* Goatee */}
+      <path d="M10.5 19.5 L12 22.5 L13.5 19.5" strokeWidth={1.5} />
     </svg>
   );
 }
 
-export function PhantomLogo({
+/**
+ * GoatLogo — wordmark + mascot lock-up. The "MY" is light, "GOAT" is heavy,
+ * honouring the acronym (Greatest Of All Time).
+ */
+export function GoatLogo({
   size = 20,
   className = "",
   variant = "duo",
 }: IconProps & { variant?: "duo" | "mono" }) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <PhantomMark
+      <GoatMark
         size={size}
         className={variant === "duo" ? "text-accent" : ""}
       />
-      <span className="font-bold tracking-tight">phantomcoach</span>
+      <span className="tracking-tight font-medium">
+        my<span className="font-black tracking-[-0.02em]">GOAT</span>
+      </span>
     </span>
   );
 }
+
+/* Back-compat aliases — leftover imports keep working until everything migrates. */
+export const PhantomMark = GoatMark;
+export const PhantomLogo = GoatLogo;
 
 /* ─── Sport icons ───────────────────────────────────────────── */
 
