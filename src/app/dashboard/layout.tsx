@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getUserState, setUserState } from "@/lib/storage";
 import { useCloudSync } from "@/lib/useCloudSync";
+import { runReconciliationsAfterSync } from "@/lib/reconcile";
 import { PhantomLogo, SyncIcon } from "@/components/icons";
 
 export default function DashboardLayout({
@@ -63,6 +64,18 @@ export default function DashboardLayout({
         // Force re-render of children consuming synced data
         window.dispatchEvent(new Event("phantomcoach:synced"));
         setTimeout(() => setSyncMsg(null), 2500);
+
+        // Background reconciliation: classify any new activities against the plan.
+        // Non-blocking; UI updates via the reconciliation-changed event.
+        runReconciliationsAfterSync()
+          .then((result) => {
+            if (result.newReconciliations.length > 0) {
+              window.dispatchEvent(new Event("phantomcoach:reconciliation-changed"));
+            }
+          })
+          .catch(() => {
+            /* swallow — reconciliation is best-effort */
+          });
       }
     } catch (e) {
       setSyncMsg(e instanceof Error ? e.message : "Network error");

@@ -8,10 +8,12 @@ import {
   type PlannedSession,
   type PlanPhase,
   type UserState,
+  type SessionReconciliation,
 } from "@/lib/storage";
 import { computeNutritionTargets } from "@/lib/nutrition";
 import { weekToText, weekToCsv, copyToClipboard, type DayKey } from "@/lib/exports";
 import { downloadFile, safeFilename } from "@/lib/pwx";
+import { reconciliationForDate } from "@/lib/reconcile";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";
 import AmendmentChatModal from "@/components/AmendmentChatModal";
 import {
@@ -58,11 +60,14 @@ export default function CalendarPage() {
     function onChange() {
       setUser(getUserState());
     }
-    window.addEventListener("phantomcoach:plan-generated", onChange);
-    window.addEventListener("phantomcoach:synced", onChange);
+    const events = [
+      "phantomcoach:plan-generated",
+      "phantomcoach:synced",
+      "phantomcoach:reconciliation-changed",
+    ];
+    events.forEach((e) => window.addEventListener(e, onChange));
     return () => {
-      window.removeEventListener("phantomcoach:plan-generated", onChange);
-      window.removeEventListener("phantomcoach:synced", onChange);
+      events.forEach((e) => window.removeEventListener(e, onChange));
     };
   }, []);
 
@@ -322,6 +327,7 @@ function WeekRow({
           {DAY_KEYS.map((key, i) => {
             const date = new Date(monday);
             date.setDate(monday.getDate() + i);
+            const dateIso = date.toISOString().slice(0, 10);
             const isToday = date.toDateString() === today.toDateString();
             const dayPhase = phaseForDate(allPhases, date) || phase;
             const sessions: PlannedSession[] = dayPhase
@@ -338,6 +344,7 @@ function WeekRow({
                     sport: "rest",
                   },
                 ];
+            const dayReconciliation = reconciliationForDate(user.reconciliations, dateIso);
 
             return (
               <div key={key} className="flex flex-col min-w-0">
@@ -367,10 +374,16 @@ function WeekRow({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
+                  {/* If the day has a logged activity, show the actual card on top
+                      and shrink the planned card down to a struck-through marker. */}
+                  {dayReconciliation && (
+                    <ActualSessionCard reconciliation={dayReconciliation} />
+                  )}
                   {sessions.map((s, idx) => (
                     <SessionCard
                       key={idx}
                       session={s}
+                      muted={Boolean(dayReconciliation)}
                       onClick={() =>
                         s.type !== "rest" &&
                         onClickSession(
@@ -608,9 +621,11 @@ function WeekSummary({
 function SessionCard({
   session,
   onClick,
+  muted = false,
 }: {
   session: PlannedSession;
   onClick: () => void;
+  muted?: boolean;
 }) {
   const palette = TYPE_STYLES[session.type] || TYPE_STYLES.easy;
   const isClickable = session.type !== "rest";
@@ -619,10 +634,13 @@ function SessionCard({
       onClick={onClick}
       disabled={!isClickable}
       className={`text-left rounded-md border px-2.5 py-2 transition ${palette.bg} ${palette.border} ${
-        isClickable
+        muted ? "opacity-40" : ""
+      } ${
+        isClickable && !muted
           ? "hover:shadow-sm hover:-translate-y-px hover:border-accent cursor-pointer"
-          : "cursor-default opacity-65"
+          : "cursor-default"
       }`}
+      title={muted ? "Plan was replaced by a logged activity for this day" : undefined}
     >
       <div className="flex items-center gap-1.5 mb-0.5">
         {session.slot && session.slot !== "REST" && (
@@ -634,20 +652,91 @@ function SessionCard({
         )}
         <span className={palette.slotColor}>{sportIcon(session.sport)}</span>
       </div>
-      <div className={`text-[11px] font-bold leading-tight ${palette.titleColor}`}>
+      <div
+        className={`text-[11px] font-bold leading-tight ${palette.titleColor} ${
+          muted ? "line-through" : ""
+        }`}
+      >
         {session.title}
       </div>
-      {session.duration && (
+      {session.duration && !muted && (
         <div className={`text-[9.5px] mt-0.5 font-medium ${palette.subtleColor}`}>
           {session.duration}
         </div>
       )}
-      {session.summary && (
+      {session.summary && !muted && (
         <div className={`text-[9.5px] leading-snug mt-0.5 ${palette.subtleColor} line-clamp-2`}>
           {session.summary}
         </div>
       )}
     </button>
+  );
+}
+
+const ACTUAL_STYLES: Record<
+  SessionReconciliation["status"],
+  { bg: string; border: string; tagBg: string; tagText: string; label: string }
+> = {
+  aligned: {
+    bg: "bg-go-soft",
+    border: "border-go/40",
+    tagBg: "bg-go/15",
+    tagText: "text-go",
+    label: "DID",
+  },
+  swapped: {
+    bg: "bg-modify-soft",
+    border: "border-modify/40",
+    tagBg: "bg-modify/15",
+    tagText: "text-modify",
+    label: "SWAP",
+  },
+  deviation: {
+    bg: "bg-accent-soft",
+    border: "border-accent-mid",
+    tagBg: "bg-accent/15",
+    tagText: "text-accent",
+    label: "DID",
+  },
+  extra: {
+    bg: "bg-surface",
+    border: "border-border",
+    tagBg: "bg-text-mid/15",
+    tagText: "text-text-mid",
+    label: "BONUS",
+  },
+  missed: {
+    bg: "bg-surface",
+    border: "border-border",
+    tagBg: "bg-text-muted/15",
+    tagText: "text-text-muted",
+    label: "MISS",
+  },
+};
+
+function ActualSessionCard({ reconciliation: r }: { reconciliation: SessionReconciliation }) {
+  const style = ACTUAL_STYLES[r.status];
+  return (
+    <div
+      className={`rounded-md border px-2.5 py-2 ${style.bg} ${style.border}`}
+      title={r.message}
+    >
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <span
+          className={`text-[8px] font-bold uppercase tracking-wider ${style.tagText} ${style.tagBg} px-1 py-px rounded`}
+        >
+          {style.label}
+        </span>
+        <span className={style.tagText}>{sportIcon(r.activitySport)}</span>
+      </div>
+      <div className={`text-[11px] font-bold leading-tight text-text line-clamp-2`}>
+        {r.activityName}
+      </div>
+      <div className="text-[9.5px] mt-0.5 font-medium text-text-mid">
+        {r.durationMin ? `${Math.round(r.durationMin)}min` : ""}
+        {r.tss ? `${r.durationMin ? " · " : ""}${r.tss} TSS` : ""}
+      </div>
+    </div>
   );
 }
 

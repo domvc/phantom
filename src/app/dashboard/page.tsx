@@ -10,12 +10,15 @@ import {
   type PlanPhase,
   type PlannedSession,
   type DailyRow,
+  type SessionReconciliation,
 } from "@/lib/storage";
+import { reconciliationForDate } from "@/lib/reconcile";
 import PerfChart from "@/components/PerfChart";
 import CoachChat from "@/components/CoachChat";
 import MetricChip from "@/components/MetricChip";
 import SessionFeedbackModal from "@/components/SessionFeedbackModal";
 import NutritionCard from "@/components/NutritionCard";
+import SessionReconcileBanner from "@/components/SessionReconcileBanner";
 
 const METRIC_DEFINITIONS = {
   ctl: "Chronic Training Load — your fitness, calculated as a 42-day exponentially-weighted average of training stress (TSS). Higher = fitter. Most endurance athletes target a CTL that scales with their goal.",
@@ -49,6 +52,7 @@ export default function DashboardHome() {
       "phantomcoach:feedback-saved",
       "phantomcoach:nutrition-logged",
       "phantomcoach:body-logged",
+      "phantomcoach:reconciliation-changed",
     ];
     events.forEach((e) => window.addEventListener(e, onChange));
     return () => events.forEach((e) => window.removeEventListener(e, onChange));
@@ -142,6 +146,14 @@ export default function DashboardHome() {
                 })}. Decisions follow below.`
               : "Sync your data in the sidebar. The coach reads it before deciding anything."}
           </p>
+
+          {/* Session reconciliation banner — what you actually did vs the plan */}
+          {user.reconciliations && user.reconciliations.length > 0 && (
+            <SessionReconcileBanner
+              reconciliations={user.reconciliations}
+              plan={user.plan}
+            />
+          )}
 
           {/* 4-up hero: Readiness · Today's Session · Last Session · Nutrition */}
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
@@ -343,6 +355,10 @@ function TodaysSessionCard({ synced, user }: { synced?: SyncedData; user: UserSt
     ? todaysSessions.find((s) => s.type !== "rest") ?? todaysSessions[0]
     : null;
 
+  // Did the athlete already complete a session today? If so, swap the card to
+  // reflect what they actually did (with the planned session shown as struck-through).
+  const todayReconciliation = reconciliationForDate(user.reconciliations, todayIso);
+
   const insight =
     !primarySession || primarySession.type === "rest"
       ? "Rest is training. Sleep 8h+ and prep tomorrow's quality."
@@ -352,7 +368,7 @@ function TodaysSessionCard({ synced, user }: { synced?: SyncedData; user: UserSt
       ? "Pace by HR ceiling, not feel. The last 30% should still be conversational."
       : "Easy means easy. If HR creeps, slow down — discipline is the win.";
 
-  if (!primarySession) {
+  if (!primarySession && !todayReconciliation) {
     return (
       <div className="bg-surface border border-dashed border-border rounded-md p-6 flex items-center justify-center text-[12.5px] text-text-muted">
         Generate your plan to see today&apos;s session
@@ -361,17 +377,52 @@ function TodaysSessionCard({ synced, user }: { synced?: SyncedData; user: UserSt
   }
 
   void synced;
+
+  // If we have a completed session for today, render the "what you did" card
+  if (todayReconciliation) {
+    const r = todayReconciliation;
+    return (
+      <div className="bg-surface border border-border-soft rounded-md p-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold">
+            Today · what you did
+          </div>
+          <span className="text-[9.5px] uppercase tracking-wider font-bold text-go bg-go-soft border border-go/30 px-2 py-0.5 rounded">
+            Logged
+          </span>
+        </div>
+        <div className="text-2xl font-bold tracking-tight mb-1">{r.activityName}</div>
+        <div className="text-[12px] text-text-muted mb-3">
+          {r.durationMin ? `${Math.round(r.durationMin)}min` : ""}
+          {r.distanceKm ? `${r.durationMin ? " · " : ""}${r.distanceKm.toFixed(1)}km` : ""}
+          {r.tss ? ` · ${r.tss} TSS` : ""}
+        </div>
+        <p className="text-[12.5px] text-text-mid leading-relaxed mb-3">{r.message}</p>
+        {r.plannedTitle && (
+          <div className="text-[11px] text-text-muted mb-3">
+            Plan said: <span className="line-through">{r.plannedTitle}</span>
+          </div>
+        )}
+        {Array.isArray(todaysSessions) && todaysSessions.length > 1 && (
+          <div className="text-[11px] text-text-muted mb-3">
+            {todaysSessions.length - 1} more session{todaysSessions.length > 2 ? "s" : ""} still scheduled today
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-surface border border-border-soft rounded-md p-6">
       <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-3">
-        Today&apos;s session{primarySession.slot && primarySession.slot !== "REST" ? ` · ${primarySession.slot}` : ""}
+        Today&apos;s session{primarySession?.slot && primarySession.slot !== "REST" ? ` · ${primarySession.slot}` : ""}
       </div>
-      <div className="text-2xl font-bold tracking-tight mb-1">{primarySession.title}</div>
-      {primarySession.duration && (
+      <div className="text-2xl font-bold tracking-tight mb-1">{primarySession?.title}</div>
+      {primarySession?.duration && (
         <div className="text-[12px] text-text-muted mb-3">{primarySession.duration}</div>
       )}
       <p className="text-[12.5px] text-text-mid leading-relaxed mb-3">
-        {primarySession.summary}
+        {primarySession?.summary}
       </p>
       {Array.isArray(todaysSessions) && todaysSessions.length > 1 && (
         <div className="text-[11px] text-text-muted mb-3">

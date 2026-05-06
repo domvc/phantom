@@ -181,6 +181,37 @@ export type SessionFeedback = {
   recordedAt: string;
 };
 
+/**
+ * After a sync brings in a new activity, we ask the model to reconcile it
+ * against what was on the plan for that day. The result drives the dashboard
+ * banner, the today-card swap, and the calendar overlay.
+ */
+export type ReconcileStatus =
+  | "aligned"   // did roughly what was planned
+  | "swapped"   // did a different sport or session, similar load
+  | "deviation" // skipped/under-did the plan, OR did much more
+  | "extra"     // bonus activity (no plan that day)
+  | "missed";   // reserved — plan day passed with nothing logged
+
+export type SessionReconciliation = {
+  activityId: string;
+  activityDate: string;        // YYYY-MM-DD
+  activityName: string;
+  activitySport?: string;      // bike, run, etc — best-effort from activity.type
+  durationMin?: number | null;
+  distanceKm?: number | null;
+  tss?: number | null;
+  plannedTitle?: string;
+  plannedSport?: string;
+  plannedType?: string;
+  status: ReconcileStatus;
+  message: string;             // ≤2 sentences, what happened vs the plan
+  reconciledAt: string;        // ISO timestamp
+  dismissed?: boolean;
+  /** Set true once user clicks "Adapt the week" so banner stops nagging */
+  adapted?: boolean;
+};
+
 export type NutritionAdherence = "under" | "hit" | "over";
 
 export type NutritionLog = {
@@ -209,6 +240,7 @@ export type UserState = {
   weeklyBriefs?: Record<string, string>;
   chatHistory?: ChatMessage[];
   sessionFeedbacks?: SessionFeedback[];
+  reconciliations?: SessionReconciliation[];
   nutritionLogs?: NutritionLog[];
   bodyMeasurements?: BodyMeasurement[];
   /** Internal migration flag — bump key when prompts change */
