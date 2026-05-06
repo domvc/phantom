@@ -775,8 +775,10 @@ function SessionCard({
   onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void;
   onDragEnd?: (e: React.DragEvent<HTMLButtonElement>) => void;
 }) {
-  const palette = TYPE_STYLES[session.type] || TYPE_STYLES.easy;
+  const palette = paletteFor(session);
   const isClickable = session.type !== "rest";
+  // Key sessions get a thicker border to flag the week's anchor workout
+  const isKey = session.type === "key" || session.type === "test";
   return (
     <button
       onClick={onClick}
@@ -784,7 +786,7 @@ function SessionCard({
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`text-left rounded-md border px-2.5 py-2 transition min-h-[88px] flex flex-col ${palette.bg} ${palette.border} ${
+      className={`text-left rounded-md ${isKey ? "border-2" : "border"} px-2.5 py-2 transition min-h-[88px] flex flex-col ${palette.bg} ${palette.border} ${
         muted ? "opacity-40" : ""
       } ${
         isClickable && !muted
@@ -808,6 +810,14 @@ function SessionCard({
           </span>
         )}
         <span className={palette.slotColor}>{sportIcon(session.sport)}</span>
+        {isKey && (
+          <span
+            className={`ml-auto text-[8px] font-black uppercase tracking-wider ${palette.titleColor}`}
+            title={session.type === "test" ? "Test session" : "Key session — week's anchor"}
+          >
+            {session.type === "test" ? "TEST" : "KEY"}
+          </span>
+        )}
       </div>
       <div
         className={`text-[11px] font-bold leading-tight ${palette.titleColor} ${
@@ -921,16 +931,62 @@ function RaceDayBanner({ race }: { race: { name: string; type: string; priority?
   );
 }
 
-const TYPE_STYLES: Record<
-  string,
-  {
-    bg: string;
-    border: string;
-    titleColor: string;
-    subtleColor: string;
-    slotColor: string;
-  }
-> = {
+/**
+ * Sport-based palette — colour identifies SPORT first, intensity is conveyed
+ * by the title text ("Easy Run", "VO2 Intervals", "Long Ride"). At a glance
+ * you can tell what discipline you're doing without reading the card.
+ *
+ *   run      → green
+ *   bike     → blue
+ *   swim     → light red
+ *   strength → purple
+ *   brick    → orange (combined-discipline session)
+ *   rest     → muted gray (dashed border)
+ */
+type Palette = {
+  bg: string;
+  border: string;
+  titleColor: string;
+  subtleColor: string;
+  slotColor: string;
+};
+
+const SPORT_STYLES: Record<string, Palette> = {
+  run: {
+    bg: "bg-[#F3FAF4]",
+    border: "border-[#B5D8B7]",
+    titleColor: "text-[#1F6B2A]",
+    subtleColor: "text-[#3F7A48]",
+    slotColor: "text-[#1F6B2A]",
+  },
+  bike: {
+    bg: "bg-[#EFF5FB]",
+    border: "border-[#B6CFE5]",
+    titleColor: "text-[#1A4A7F]",
+    subtleColor: "text-[#4673A0]",
+    slotColor: "text-[#1A4A7F]",
+  },
+  swim: {
+    bg: "bg-[#FCEFEF]",
+    border: "border-[#E5B8B8]",
+    titleColor: "text-[#A02E2E]",
+    subtleColor: "text-[#823E3E]",
+    slotColor: "text-[#A02E2E]",
+  },
+  strength: {
+    bg: "bg-[#F4F0F8]",
+    border: "border-[#C8B5DC]",
+    titleColor: "text-[#5B3A8E]",
+    subtleColor: "text-[#7A5BA8]",
+    slotColor: "text-[#5B3A8E]",
+  },
+  brick: {
+    bg: "bg-accent-soft",
+    border: "border-accent-mid",
+    titleColor: "text-accent",
+    subtleColor: "text-[#9B5530]",
+    slotColor: "text-accent",
+  },
   rest: {
     bg: "bg-bg",
     border: "border-dashed border-border",
@@ -938,70 +994,26 @@ const TYPE_STYLES: Record<
     subtleColor: "text-text-muted",
     slotColor: "text-text-muted",
   },
-  easy: {
-    bg: "bg-[#F3FAF4]",
-    border: "border-[#B5D8B7]",
-    titleColor: "text-[#1F6B2A]",
-    subtleColor: "text-[#3F7A48]",
-    slotColor: "text-[#1F6B2A]",
-  },
-  hard: {
-    bg: "bg-[#FEF8F5]",
-    border: "border-accent-mid",
-    titleColor: "text-accent",
-    subtleColor: "text-[#9B5530]",
-    slotColor: "text-accent",
-  },
-  tempo: {
-    bg: "bg-[#FEF8F5]",
-    border: "border-accent-mid",
-    titleColor: "text-accent",
-    subtleColor: "text-[#9B5530]",
-    slotColor: "text-accent",
-  },
-  key: {
-    bg: "bg-accent",
-    border: "border-accent-h",
-    titleColor: "text-white",
-    subtleColor: "text-white/70",
-    slotColor: "text-white/55",
-  },
-  long: {
-    bg: "bg-[#F0F5FC]",
-    border: "border-[#A8C0E0]",
-    titleColor: "text-[#2A4A8A]",
-    subtleColor: "text-[#4A6AAA]",
-    slotColor: "text-[#2A4A8A]",
-  },
-  strength: {
+};
+
+/**
+ * Resolve a palette for a session. Sport drives the colour; sessions without
+ * a sport (legacy plans) fall back to a neutral gray surface.
+ */
+function paletteFor(session: PlannedSession): Palette {
+  if (session.type === "rest") return SPORT_STYLES.rest;
+  if (session.sport && SPORT_STYLES[session.sport]) {
+    return SPORT_STYLES[session.sport];
+  }
+  // Legacy plan with no sport tag — neutral fallback so we don't crash
+  return {
     bg: "bg-surface-2",
     border: "border-border",
     titleColor: "text-text-mid",
     subtleColor: "text-text-muted",
     slotColor: "text-text-muted",
-  },
-  swim: {
-    bg: "bg-[#EEF7FB]",
-    border: "border-[#9DCEE2]",
-    titleColor: "text-[#1F5A75]",
-    subtleColor: "text-[#3F7A95]",
-    slotColor: "text-[#1F5A75]",
-  },
-  brick: {
-    bg: "bg-accent-soft",
-    border: "border-accent",
-    titleColor: "text-accent",
-    subtleColor: "text-[#9B5530]",
-    slotColor: "text-accent",
-  },
-  test: {
-    bg: "bg-modify-soft",
-    border: "border-[#E8B780]",
-    titleColor: "text-modify",
-    subtleColor: "text-[#7A4500]",
-    slotColor: "text-modify",
-  },
-};
+  };
+}
 
 function sportIcon(sport?: string) {
   switch (sport) {
