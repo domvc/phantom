@@ -36,6 +36,7 @@ export default function DashboardHome() {
   const [user, setUser] = useState<UserState>({});
   const [planState, setPlanState] = useState<"idle" | "generating" | "error">("idle");
   const [planError, setPlanError] = useState<string | null>(null);
+  const [planSuccessFlash, setPlanSuccessFlash] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState<{
     activity: RecentActivity;
     plannedSession: PlannedSession | null;
@@ -73,6 +74,8 @@ export default function DashboardHome() {
     setUser(getUserState());
     window.dispatchEvent(new Event("phantomcoach:plan-generated"));
     setPlanState("idle");
+    setPlanSuccessFlash(true);
+    setTimeout(() => setPlanSuccessFlash(false), 4000);
   }
 
   const synced = user.synced;
@@ -234,6 +237,37 @@ export default function DashboardHome() {
         athleteNotes={user.athleteNotes}
         raceGoal={race}
       />
+
+      {/* Plan-regenerated toast — slides up from the bottom-right, auto-dismisses */}
+      {planSuccessFlash && (
+        <div className="fixed bottom-6 right-6 z-50 bg-text text-bg rounded-md shadow-2xl px-4 py-3 flex items-center gap-3 animate-toast-in">
+          <span className="size-6 rounded-full bg-go flex items-center justify-center flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-bg" aria-hidden>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </span>
+          <div>
+            <div className="text-[13px] font-bold tracking-tight">Plan regenerated successfully</div>
+            <div className="text-[11px] opacity-70">Your training plan is up to date.</div>
+          </div>
+          <button
+            onClick={() => setPlanSuccessFlash(false)}
+            className="ml-2 text-bg/50 hover:text-bg text-lg leading-none"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+          <style>{`
+            @keyframes toast-in-keys {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-toast-in {
+              animation: toast-in-keys 220ms ease-out;
+            }
+          `}</style>
+        </div>
+      )}
     </>
   );
 }
@@ -679,28 +713,48 @@ function PlanBanner({
   }
 
   return (
-    <div className="bg-surface border border-border-soft rounded-md p-4 mb-5 flex items-center justify-between gap-4">
-      <div className="flex-1 min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-0.5">
-          Your training plan
-        </div>
-        <div className="text-[13px] font-bold tracking-tight text-text">
-          {totalWeeks} weeks · {phasesCount} phases · {milestonesCount} milestones
-        </div>
-        {generated && (
-          <div className="text-[10.5px] text-text-muted mt-0.5">
-            Generated {generated}
+    <div className="relative bg-surface border border-border-soft rounded-md p-4 mb-5 overflow-hidden">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-0.5">
+            Your training plan
           </div>
-        )}
+          <div className="text-[13px] font-bold tracking-tight text-text">
+            {totalWeeks} weeks · {phasesCount} phases · {milestonesCount} milestones
+          </div>
+          {generated && (
+            <div className="text-[10.5px] text-text-muted mt-0.5">
+              {state === "generating" ? "Regenerating…" : `Generated ${generated}`}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={onGenerate}
+          disabled={state === "generating"}
+          className="px-3 py-1.5 border border-border hover:border-accent hover:text-accent disabled:opacity-50 text-text-mid text-[11.5px] font-semibold rounded-md transition whitespace-nowrap"
+        >
+          {state === "generating" ? "Regenerating…" : "Regenerate"}
+        </button>
       </div>
-      <button
-        onClick={onGenerate}
-        disabled={state === "generating"}
-        className="px-3 py-1.5 border border-border hover:border-accent hover:text-accent disabled:opacity-50 text-text-mid text-[11.5px] font-semibold rounded-md transition whitespace-nowrap"
-      >
-        {state === "generating" ? "Regenerating…" : "Regenerate"}
-      </button>
-      {error && <div className="text-[12px] text-modify font-medium">{error}</div>}
+      {error && <div className="text-[12px] text-modify font-medium mt-2">{error}</div>}
+
+      {/* Bold animated progress bar pinned to the bottom of the banner during regeneration */}
+      {state === "generating" && (
+        <div className="absolute left-0 right-0 bottom-0 h-1 bg-accent-soft overflow-hidden">
+          <div className="absolute inset-y-0 left-0 w-1/3 bg-accent rounded-r-full animate-plan-progress" />
+        </div>
+      )}
+
+      <style>{`
+        @keyframes plan-progress-slide {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(150%); }
+          100% { transform: translateX(350%); }
+        }
+        .animate-plan-progress {
+          animation: plan-progress-slide 1.6s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
