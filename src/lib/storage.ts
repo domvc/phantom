@@ -21,11 +21,22 @@ export type RaceType =
   | "Ironman"
   | "Other";
 
+/**
+ * Race priority drives plan-generator behaviour:
+ *   A — primary goal, full taper + peak. The plan anchors to this date.
+ *   B — secondary goal, gets a 3-5 day mini-taper + 4-7 day recovery, no full peak.
+ *   C — fitness check / race-pace simulation, treated as a quality session inside the build phase. No taper.
+ */
+export type RacePriority = "A" | "B" | "C";
+
 export type RaceGoal = {
+  /** Stable id, auto-generated when added. Used for edit/delete. */
+  id?: string;
   name: string;
   type: RaceType;
   date: string;
   targetTime: string;
+  priority?: RacePriority;
   /** Free-text race format detail — used for ultras (distance/duration), backyard formats, multi-day events. */
   raceDetails?: string;
   notes?: string;
@@ -239,7 +250,10 @@ export type BodyMeasurement = {
 
 export type UserState = {
   intervals?: IntervalsConnection;
+  /** @deprecated read-only mirror of the next A-race in `races`. New code should use `races`. */
   raceGoal?: RaceGoal;
+  /** Source of truth for race goals. First entry by date is the primary A-race. */
+  races?: RaceGoal[];
   trainingPrefs?: TrainingPrefs;
   athleteNotes?: AthleteNotes;
   onboardingComplete?: boolean;
@@ -256,7 +270,7 @@ export type UserState = {
   briefVersion?: number;
 };
 
-const CURRENT_BRIEF_VERSION = 5;
+const CURRENT_BRIEF_VERSION = 6;
 
 const KEY = "phantomcoach:user";
 
@@ -266,16 +280,73 @@ export function getUserState(): UserState {
     const raw = localStorage.getItem(KEY);
     if (!raw) return {};
     const state: UserState = JSON.parse(raw);
-    // One-shot migration: clear stale weekly briefs when prompt schema bumps.
+    let dirty = false;
+
+    // Migration: clear stale weekly briefs when prompt schema bumps.
     if ((state.briefVersion ?? 0) < CURRENT_BRIEF_VERSION) {
       state.weeklyBriefs = {};
       state.briefVersion = CURRENT_BRIEF_VERSION;
-      localStorage.setItem(KEY, JSON.stringify(state));
+      dirty = true;
     }
+
+    // Migration: hoist legacy single raceGoal into the new races[] array.
+    if (state.raceGoal && !state.races) {
+      state.races = [
+        {
+          ...state.raceGoal,
+          id: state.raceGoal.id ?? generateRaceId(),
+          priority: state.raceGoal.priority ?? "A",
+        },
+      ];
+      dirty = true;
+    }
+
+    // Keep raceGoal in sync with races[] (back-compat read for older code).
+    // Always points at the next upcoming A-race; falls back to next race of any priority.
+    if (state.races && state.races.length > 0) {
+      const primary = nextPrimaryRace(state.races);
+      if (primary && JSON.stringify(state.raceGoal) !== JSON.stringify(primary)) {
+        state.raceGoal = primary;
+        dirty = true;
+      }
+    }
+
+    if (dirty) localStorage.setItem(KEY, JSON.stringify(state));
     return state;
   } catch {
     return {};
   }
+}
+
+/** Generate a stable id for a new race entry. */
+export function generateRaceId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `race_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Return the next race that should anchor the plan.
+ * Prefers the next upcoming A-race; falls back to the next upcoming race; falls back
+ * to the most recent past A-race so existing readers don't suddenly go undefined.
+ */
+export function nextPrimaryRace(races: RaceGoal[]): RaceGoal | undefined {
+  if (!races || races.length === 0) return undefined;
+  const today = new Date().toISOString().slice(0, 10);
+  const sorted = [...races].sort((a, b) => a.date.localeCompare(b.date));
+  return (
+    sorted.find((r) => r.date >= today && (r.priority ?? "A") === "A") ??
+    sorted.find((r) => r.date >= today) ??
+    [...sorted].reverse().find((r) => (r.priority ?? "A") === "A") ??
+    sorted[0]
+  );
+}
+
+/** Return all races sorted chronologically. */
+export function sortedRaces(races?: RaceGoal[]): RaceGoal[] {
+  if (!races) return [];
+  return [...races].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function setUserState(patch: Partial<UserState>) {

@@ -69,7 +69,15 @@ export async function POST(req: NextRequest) {
   }
 
   const reqBody = await req.json().catch(() => ({}));
-  const { synced, raceGoal, trainingPrefs, athleteNotes, amendments, sessionFeedbacks } = reqBody;
+  const {
+    synced,
+    raceGoal,
+    races: racesIn,
+    trainingPrefs,
+    athleteNotes,
+    amendments,
+    sessionFeedbacks,
+  } = reqBody;
 
   if (!raceGoal?.date) {
     return NextResponse.json({ ok: false, error: "No race goal set" }, { status: 400 });
@@ -87,12 +95,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // races[] is the source of truth, but back-compat: build it from raceGoal if absent
+  type IncomingRace = {
+    id?: string;
+    name: string;
+    type: string;
+    date: string;
+    targetTime?: string;
+    priority?: "A" | "B" | "C";
+    raceDetails?: string;
+  };
+  const races: IncomingRace[] = Array.isArray(racesIn) && racesIn.length > 0
+    ? racesIn
+    : [{ ...raceGoal, priority: "A" as const }];
+  const todayIso = today.toISOString().slice(0, 10);
+  const upcomingRaces = races
+    .filter((r) => r.date && r.date >= todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const secondaryRaces = upcomingRaces.filter((r) => r.date !== raceGoal.date);
+
   const userPrompt = `Generate the training plan now.
 
-TODAY: ${today.toISOString().slice(0, 10)}
-WEEKS TO RACE: ${totalWeeks}
+TODAY: ${todayIso}
+WEEKS TO PRIMARY A-RACE: ${totalWeeks}
 
-RACE GOAL:
+PRIMARY A-RACE (the plan anchors here):
 ${JSON.stringify(raceGoal, null, 2)}
 ${
   raceGoal.type === "Ultra"
@@ -105,6 +132,26 @@ ULTRA-SPECIFIC GUIDANCE:
 - Strength/mobility is non-negotiable for ultras: posterior chain, hip stability, foot strength.`
     : ""
 }
+
+SECONDARY RACES (B/C — must be respected in the plan):
+${
+  secondaryRaces.length === 0
+    ? "(none — single A-race plan)"
+    : secondaryRaces
+        .map(
+          (r) =>
+            `- ${r.priority ?? "A"}-race · ${r.name} · ${r.type} · ${r.date}${r.targetTime ? ` · target ${r.targetTime}` : ""}${r.raceDetails ? ` · ${r.raceDetails}` : ""}`
+        )
+        .join("\n")
+}
+
+A/B/C RACE HANDLING (load-bearing — periodisation lives here):
+- A-RACE: full taper (1-2 week reduced volume, intensity maintained), full peak phase before. Plan anchors to its date. Race day milestone is mandatory and last.
+- B-RACE: 3-5 day mini-taper (no full week off), then a 4-7 day recovery week after. Phase structure must accommodate: build INTO the B-race, mini-peak, B-race day, recovery, then resume build toward the A-race. Treat the B-race itself as a milestone (type: "race"). Do NOT abandon the A-race trajectory — recovery should be brief.
+- C-RACE: NO taper, NO recovery week. Treated as a race-pace simulation that REPLACES that day's planned quality session. Milestone type: "race" but flag in the desc as "fitness check / race-pace simulation". Surrounding week stays normal.
+- If multiple B-races stack within 4 weeks: the closest one to the A-race gets the mini-taper; earlier B-races within that window are downgraded to C-race treatment automatically (mention this in your phase focus copy).
+- Phases must respect race timing — e.g. you cannot be deep in a "build" phase 4 days before a B-race; insert a pre-B-race mini-taper phase if needed.
+- If the secondary list is empty, ignore all of this and run a standard A-race-only plan.
 
 TRAINING PREFERENCES (the athlete chose these — RESPECT THEM):
 ${

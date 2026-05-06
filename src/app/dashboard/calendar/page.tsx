@@ -411,6 +411,7 @@ function WeekRow({
                 ? [{ ...fallback, summary: "Rest" }]
                 : [fallback];
             const dayReconciliation = reconciliationForDate(user.reconciliations, dateIso);
+            const dayRace = (user.races ?? []).find((r) => r.date === dateIso);
             const isDropTarget = dragHoverKey === key && dragSourceKey !== null && dragSourceKey !== key;
             const isDragSource = dragSourceKey === key;
 
@@ -478,6 +479,8 @@ function WeekRow({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
+                  {/* Race-day banner — slots above sessions for the day */}
+                  {dayRace && <RaceDayBanner race={dayRace} />}
                   {/* If the day has a logged activity, show the actual card on top
                       and shrink the planned card down to a struck-through marker. */}
                   {dayReconciliation && (
@@ -871,6 +874,30 @@ function ActualSessionCard({ reconciliation: r }: { reconciliation: SessionRecon
       <div className="text-[9.5px] mt-0.5 font-medium text-text-mid">
         {r.durationMin ? `${Math.round(r.durationMin)}min` : ""}
         {r.tss ? `${r.durationMin ? " · " : ""}${r.tss} TSS` : ""}
+      </div>
+    </div>
+  );
+}
+
+const RACE_PRIORITY_STYLES = {
+  A: { bg: "bg-accent", text: "text-white", ring: "border-accent" },
+  B: { bg: "bg-accent-soft", text: "text-accent", ring: "border-accent-mid" },
+  C: { bg: "bg-surface-2", text: "text-text-mid", ring: "border-border" },
+} as const;
+
+function RaceDayBanner({ race }: { race: { name: string; type: string; priority?: "A" | "B" | "C"; targetTime?: string } }) {
+  const priority = race.priority ?? "A";
+  const style = RACE_PRIORITY_STYLES[priority];
+  return (
+    <div
+      className={`rounded-md border-2 ${style.ring} ${style.bg} ${style.text} px-2 py-1.5 text-center`}
+      title={`${priority}-race · ${race.name}${race.targetTime ? ` · target ${race.targetTime}` : ""}`}
+    >
+      <div className="text-[8.5px] uppercase tracking-[0.12em] font-black opacity-90">
+        {priority}-RACE
+      </div>
+      <div className="text-[10px] font-extrabold leading-tight mt-0.5 line-clamp-2">
+        {race.name}
       </div>
     </div>
   );

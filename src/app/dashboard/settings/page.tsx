@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   clearUserState,
+  generateRaceId,
   getUserState,
   setUserState,
+  sortedRaces,
   type AthleteNotes,
   type RaceGoal,
+  type RacePriority,
   type UserState,
 } from "@/lib/storage";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -313,6 +316,31 @@ const RACE_TYPES: RaceGoal["type"][] = [
   "Other",
 ];
 
+const PRIORITY_DESCRIPTIONS: Record<RacePriority, string> = {
+  A: "Primary goal — full taper, full peak. The plan anchors here.",
+  B: "Secondary goal — short mini-taper, brief recovery, no full peak.",
+  C: "Fitness check — race-pace simulation inside normal training, no taper.",
+};
+
+const PRIORITY_PILL: Record<RacePriority, { bg: string; text: string; ring: string }> = {
+  A: { bg: "bg-accent", text: "text-white", ring: "ring-accent" },
+  B: { bg: "bg-accent-soft", text: "text-accent", ring: "ring-accent-mid" },
+  C: { bg: "bg-surface-2", text: "text-text-mid", ring: "ring-border" },
+};
+
+function emptyDraft(): RaceGoal {
+  return {
+    id: generateRaceId(),
+    name: "",
+    type: "Half Ironman",
+    date: "",
+    targetTime: "",
+    priority: "A",
+    raceDetails: "",
+    notes: "",
+  };
+}
+
 function RaceGoalEditor({
   user,
   onSaved,
@@ -320,104 +348,106 @@ function RaceGoalEditor({
   user: UserState;
   onSaved: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<RaceGoal>(
-    user.raceGoal ?? {
-      name: "",
-      type: "Half Ironman",
-      date: "",
-      targetTime: "",
-      raceDetails: "",
-      notes: "",
-    }
-  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<RaceGoal>(emptyDraft());
   const [savedFlash, setSavedFlash] = useState(false);
 
-  // Reset draft when entering edit mode (so editing always starts from current)
-  function startEdit() {
-    setDraft(
-      user.raceGoal ?? {
-        name: "",
-        type: "Half Ironman",
-        date: "",
-        targetTime: "",
-        raceDetails: "",
-        notes: "",
-      }
-    );
-    setEditing(true);
+  const races = sortedRaces(user.races);
+
+  function startAdd() {
+    setDraft({
+      ...emptyDraft(),
+      // If they already have an A-race, default new entries to B
+      priority: races.some((r) => (r.priority ?? "A") === "A") ? "B" : "A",
+    });
+    setEditingId("__new__");
+  }
+
+  function startEdit(race: RaceGoal) {
+    setDraft({ ...race });
+    setEditingId(race.id ?? "__new__");
   }
 
   function cancel() {
-    setEditing(false);
+    setEditingId(null);
   }
 
   function save() {
     if (!draft.name || !draft.date) return;
-    setUserState({ raceGoal: draft });
-    setEditing(false);
+    const id = draft.id ?? generateRaceId();
+    const next = { ...draft, id };
+    const existing = user.races ?? [];
+    const updated =
+      editingId === "__new__"
+        ? [...existing, next]
+        : existing.map((r) => (r.id === id ? next : r));
+    setUserState({ races: updated });
+    setEditingId(null);
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2500);
     onSaved();
     window.dispatchEvent(new Event("phantomcoach:notes-updated"));
   }
 
-  const showRaceDetails = draft.type === "Ultra" || draft.type === "Other";
+  function remove(race: RaceGoal) {
+    if (!race.id) return;
+    if (
+      !confirm(
+        `Remove "${race.name}" from your race list? This won't change the existing plan — you'll need to Regenerate to drop the impact.`
+      )
+    )
+      return;
+    const updated = (user.races ?? []).filter((r) => r.id !== race.id);
+    setUserState({ races: updated });
+    onSaved();
+    window.dispatchEvent(new Event("phantomcoach:notes-updated"));
+  }
 
-  if (!editing) {
-    if (!user.raceGoal) {
-      return (
-        <div className="bg-surface border border-dashed border-border rounded-md p-8 text-center text-[13px] text-text-muted">
-          No race goal set —{" "}
-          <button
-            onClick={startEdit}
-            className="text-accent font-semibold hover:underline"
-          >
-            add one
-          </button>
-        </div>
-      );
-    }
+  // List view
+  if (!editingId) {
     return (
-      <div className="bg-surface border border-border-soft rounded-md p-5 flex items-start gap-4">
-        <div className="size-10 rounded-md bg-accent-soft border border-accent-mid flex items-center justify-center flex-shrink-0">
-          <FlagIcon size={18} className="text-accent" />
-        </div>
-        <div className="flex-1">
-          <div className="font-bold text-[15px] tracking-tight">
-            {user.raceGoal.name}
+      <div className="space-y-3">
+        {races.length === 0 ? (
+          <div className="bg-surface border border-dashed border-border rounded-md p-8 text-center text-[13px] text-text-muted">
+            No races yet —{" "}
+            <button
+              onClick={startAdd}
+              className="text-accent font-semibold hover:underline"
+            >
+              add one
+            </button>
           </div>
-          <div className="text-[12px] text-text-muted mt-0.5">
-            {user.raceGoal.type} ·{" "}
-            {new Date(user.raceGoal.date).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-            {user.raceGoal.targetTime ? ` · target ${user.raceGoal.targetTime}` : ""}
+        ) : (
+          races.map((race) => (
+            <RaceRow
+              key={race.id ?? race.name + race.date}
+              race={race}
+              onEdit={() => startEdit(race)}
+              onRemove={() => remove(race)}
+            />
+          ))
+        )}
+
+        {races.length > 0 && (
+          <button
+            onClick={startAdd}
+            className="w-full px-4 py-2.5 bg-bg border border-dashed border-border hover:border-accent hover:text-accent text-text-mid text-[12.5px] font-semibold rounded-md transition flex items-center justify-center gap-2"
+          >
+            <span className="text-lg leading-none">+</span> Add another race
+          </button>
+        )}
+
+        {savedFlash && (
+          <div className="text-[11.5px] text-go font-semibold pl-1">
+            ✓ Saved — click Regenerate on the dashboard to refresh the plan
           </div>
-          {user.raceGoal.raceDetails && (
-            <div className="text-[12.5px] text-text-mid mt-2 leading-relaxed">
-              <span className="text-text-muted">Format: </span>
-              {user.raceGoal.raceDetails}
-            </div>
-          )}
-          {savedFlash && (
-            <div className="mt-2 text-[11.5px] text-go font-semibold">
-              ✓ Saved — click Regenerate on the dashboard to refresh the plan
-            </div>
-          )}
-        </div>
-        <button
-          onClick={startEdit}
-          className="text-[12px] px-3 py-1.5 border border-border hover:border-accent hover:text-accent text-text-mid rounded-md transition"
-        >
-          Edit
-        </button>
+        )}
       </div>
     );
   }
 
+  // Edit form
+  const showRaceDetails = draft.type === "Ultra" || draft.type === "Other";
   return (
     <div className="bg-surface border border-border rounded-md p-5 space-y-4">
       <div>
@@ -430,6 +460,31 @@ function RaceGoalEditor({
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           className="w-full px-3 py-2 bg-bg border border-border rounded-md text-[13px] focus:outline-none focus:border-accent transition"
         />
+      </div>
+
+      <div>
+        <label className="block text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-bold mb-1.5">
+          Priority
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          {(["A", "B", "C"] as RacePriority[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setDraft({ ...draft, priority: p })}
+              className={`px-3 py-2 text-[12px] font-bold rounded-md border transition ${
+                draft.priority === p
+                  ? "bg-accent text-white border-accent"
+                  : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+              }`}
+            >
+              {p}-race
+            </button>
+          ))}
+        </div>
+        <div className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
+          {PRIORITY_DESCRIPTIONS[draft.priority ?? "A"]}
+        </div>
       </div>
 
       <div>
@@ -495,13 +550,13 @@ function RaceGoalEditor({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-1">
+      <div className="flex items-center gap-3 pt-1 flex-wrap">
         <button
           onClick={save}
           disabled={!draft.name || !draft.date}
           className="px-4 py-2 bg-accent hover:bg-accent-h disabled:opacity-30 text-white text-[12px] font-semibold rounded-md transition"
         >
-          Save race goal
+          {editingId === "__new__" ? "Add race" : "Save changes"}
         </button>
         <button
           onClick={cancel}
@@ -510,8 +565,87 @@ function RaceGoalEditor({
           Cancel
         </button>
         <span className="text-[11px] text-text-muted ml-auto">
-          You&apos;ll need to Regenerate your plan after saving.
+          Click Regenerate on the dashboard to apply changes.
         </span>
+      </div>
+    </div>
+  );
+}
+
+function RaceRow({
+  race,
+  onEdit,
+  onRemove,
+}: {
+  race: RaceGoal;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const priority = (race.priority ?? "A") as RacePriority;
+  const pill = PRIORITY_PILL[priority];
+  const today = new Date().toISOString().slice(0, 10);
+  const isPast = race.date < today;
+  const daysAway = Math.ceil(
+    (new Date(race.date).getTime() - Date.now()) / 86_400_000
+  );
+
+  return (
+    <div
+      className={`bg-surface border border-border-soft rounded-md p-5 flex items-start gap-4 ${
+        isPast ? "opacity-65" : ""
+      }`}
+    >
+      <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
+        <span
+          className={`size-9 rounded-md ${pill.bg} ${pill.text} font-black text-[15px] flex items-center justify-center`}
+          title={PRIORITY_DESCRIPTIONS[priority]}
+        >
+          {priority}
+        </span>
+        <FlagIcon size={14} className="text-text-muted" />
+      </div>
+      <div className="flex-1">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="font-bold text-[15px] tracking-tight">{race.name}</span>
+          <span className="text-[11px] text-text-muted uppercase tracking-wider font-bold">
+            {race.type}
+          </span>
+        </div>
+        <div className="text-[12px] text-text-muted mt-0.5">
+          {new Date(race.date).toLocaleDateString("en-GB", {
+            weekday: "short",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })}
+          {!isPast && daysAway >= 0 && (
+            <span className="ml-2 text-text-mid">
+              · {daysAway === 0 ? "today" : `${daysAway} day${daysAway === 1 ? "" : "s"} away`}
+            </span>
+          )}
+          {isPast && <span className="ml-2 text-text-muted">· past</span>}
+          {race.targetTime ? ` · target ${race.targetTime}` : ""}
+        </div>
+        {race.raceDetails && (
+          <div className="text-[12.5px] text-text-mid mt-2 leading-relaxed">
+            <span className="text-text-muted">Format: </span>
+            {race.raceDetails}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <button
+          onClick={onEdit}
+          className="text-[12px] px-3 py-1.5 border border-border hover:border-accent hover:text-accent text-text-mid rounded-md transition"
+        >
+          Edit
+        </button>
+        <button
+          onClick={onRemove}
+          className="text-[11px] px-3 py-1.5 text-text-muted hover:text-modify transition"
+        >
+          Remove
+        </button>
       </div>
     </div>
   );

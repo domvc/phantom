@@ -26,6 +26,7 @@ export async function generatePlanFromState(): Promise<GeneratePlanResult> {
       body: JSON.stringify({
         synced: s.synced,
         raceGoal: s.raceGoal,
+        races: s.races,
         trainingPrefs: s.trainingPrefs,
         athleteNotes: s.athleteNotes,
         amendments: s.amendments,

@@ -85,7 +85,15 @@ export default function OnboardingPage() {
           {step === "race" && (
             <RaceStep
               onNext={(goal, prefs) => {
-                setUserState({ raceGoal: goal, trainingPrefs: prefs });
+                // Write to races[] (source of truth) and raceGoal (back-compat).
+                // Onboarding sets a single A-race; B/C races are added later in Settings.
+                const id = goal.id ?? crypto.randomUUID();
+                const primary = { ...goal, id, priority: goal.priority ?? "A" as const };
+                setUserState({
+                  raceGoal: primary,
+                  races: [primary],
+                  trainingPrefs: prefs,
+                });
                 setStep("goals");
               }}
               onBack={() => setStep("intervals")}
