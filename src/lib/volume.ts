@@ -95,25 +95,36 @@ export function rangeBounds(range: VolumeRange, now = new Date()): { start: Date
   return { start, end };
 }
 
-const RUN_PATTERNS = /run/i;
-const BIKE_PATTERNS = /ride|bike|cycl|zwift/i;
+const RUN_PATTERNS = /run|treadmill|jog/i;
+const BIKE_PATTERNS = /ride|bike|cycl|peloton|spin\b/i;
 const SWIM_PATTERNS = /swim/i;
-const STRENGTH_PATTERNS = /strength|weight|gym|workout|crossfit|lift/i;
+const STRENGTH_PATTERNS = /strength|weight|gym|workout|crossfit|lift|hyrox/i;
 
-/** Map an Intervals activity.type string to our sport vocabulary. */
-export function classifyActivitySport(type: string | undefined): VolumeSport {
-  if (!type) return "all";
-  if (BIKE_PATTERNS.test(type)) return "bike";
-  if (RUN_PATTERNS.test(type)) return "run";
-  if (SWIM_PATTERNS.test(type)) return "swim";
-  if (STRENGTH_PATTERNS.test(type)) return "strength";
+/**
+ * Map an Intervals activity to our sport vocabulary.
+ *
+ * We classify on `type` first (Strava-style: "Run", "VirtualRide", "WeightTraining"),
+ * but Intervals occasionally hands back generic types like "Workout" — in that case
+ * we fall back to scanning the activity name. "VirtualRun" / "Zwift Run" still
+ * route to "run" because we check bike LAST among the multi-word ambiguity sources.
+ */
+export function classifyActivitySport(type?: string, name?: string): VolumeSport {
+  const t = type || "";
+  const n = name || "";
+  // RUN first (so "Zwift Run" / "VirtualRun" don't get bike-classified by zwift/virtual hints)
+  if (RUN_PATTERNS.test(t) || RUN_PATTERNS.test(n)) return "run";
+  if (SWIM_PATTERNS.test(t) || SWIM_PATTERNS.test(n)) return "swim";
+  if (STRENGTH_PATTERNS.test(t) || STRENGTH_PATTERNS.test(n)) return "strength";
+  if (BIKE_PATTERNS.test(t) || BIKE_PATTERNS.test(n)) return "bike";
+  // Common Strava/Intervals-only platform names that hint sport
+  if (/zwift|trainerroad|wahoo systm/i.test(n)) return "bike";
   return "all";
 }
 
 /** Filter activities by sport. "all" matches everything, "strength" matches gym-style activities. */
 function matchesSport(a: RecentActivity, sport: VolumeSport): boolean {
   if (sport === "all") return true;
-  return classifyActivitySport(a.type) === sport;
+  return classifyActivitySport(a.type, a.name) === sport;
 }
 
 function withinRange(activityDate: string, start: Date, end: Date): boolean {
@@ -243,7 +254,7 @@ export function computeVolume(
     const totalKm = round1(
       sum(
         filtered
-          .filter((a) => classifyActivitySport(a.type) !== "strength")
+          .filter((a) => classifyActivitySport(a.type, a.name) !== "strength")
           .map((a) => a.distance_km ?? 0)
       )
     );

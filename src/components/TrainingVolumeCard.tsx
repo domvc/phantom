@@ -29,9 +29,10 @@ const SPORT_GLYPHS: Record<VolumeSport, React.ReactNode> = {
 
 type Props = {
   activities?: RecentActivity[];
+  syncedAt?: string;
 };
 
-export default function TrainingVolumeCard({ activities }: Props) {
+export default function TrainingVolumeCard({ activities, syncedAt }: Props) {
   const [sport, setSport] = useState<VolumeSport>("all");
   const [range, setRange] = useState<VolumeRange>("last_30");
 
@@ -39,6 +40,18 @@ export default function TrainingVolumeCard({ activities }: Props) {
     if (!activities) return null;
     return computeVolume(activities, sport, range);
   }, [activities, sport, range]);
+
+  // Find the date span the synced activities actually cover — useful when the
+  // user's expecting a recent run that hasn't been synced yet.
+  const dataWindow = useMemo(() => {
+    if (!activities || activities.length === 0) return null;
+    const sorted = [...activities].sort((a, b) => a.date.localeCompare(b.date));
+    return {
+      oldest: sorted[0].date.slice(0, 10),
+      newest: sorted[sorted.length - 1].date.slice(0, 10),
+      count: activities.length,
+    };
+  }, [activities]);
 
   if (!activities || activities.length === 0) {
     return (
@@ -86,8 +99,28 @@ export default function TrainingVolumeCard({ activities }: Props) {
       </div>
 
       {stats && <VolumeStatsBlock stats={stats} sport={sport} />}
+
+      {dataWindow && (
+        <div className="mt-4 pt-3 border-t border-border-soft text-[10.5px] text-text-muted flex items-center justify-between gap-3 flex-wrap">
+          <span>
+            Reading <strong className="text-text-mid">{dataWindow.count}</strong> activities
+            from <strong className="text-text-mid">{formatShort(dataWindow.oldest)}</strong> →{" "}
+            <strong className="text-text-mid">{formatShort(dataWindow.newest)}</strong>
+          </span>
+          {syncedAt && (
+            <span>Last sync: {new Date(syncedAt).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</span>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+function formatShort(iso: string): string {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function RangeSelector({

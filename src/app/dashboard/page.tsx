@@ -160,7 +160,10 @@ export default function DashboardHome() {
           {synced && <MetricStrip synced={synced} />}
 
           {/* Training volume — Strava-style with sport + range filters */}
-          <TrainingVolumeCard activities={synced?.recent_activities} />
+          <TrainingVolumeCard
+            activities={synced?.recent_activities}
+            syncedAt={synced?.synced_at}
+          />
 
           {/* Plan banner */}
           <PlanBanner
