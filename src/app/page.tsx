@@ -30,7 +30,7 @@ export default function Home() {
       <Sports />
       <WhatsInside />
       <HowItWorks />
-      <Pricing />
+      <FinalCTA />
       <FAQ />
       <Footer />
     </div>
@@ -47,7 +47,6 @@ function Header() {
         <nav className="hidden sm:flex items-center gap-7 text-[13px] text-white/60">
           <a href="#inside" className="hover:text-white transition">What&apos;s inside</a>
           <a href="#how" className="hover:text-white transition">How it works</a>
-          <a href="#pricing" className="hover:text-white transition">Pricing</a>
           <a href="#faq" className="hover:text-white transition">FAQ</a>
         </nav>
         <div className="flex items-center gap-3">
@@ -135,9 +134,11 @@ function Hero() {
                 Connect your data. Set your goal. Get the plan that gets you
                 there.
               </span>{" "}
-              Phantomcoach is built on decades of sport science, hundreds of
-              elite training protocols, and the live signal from your wearables
-              — calibrated to you, recalibrated every day.
+              Every published sport-science paper. Every elite coaching
+              framework on the planet. Read by the world&apos;s most capable AI
+              and applied to the live signal from your watch — watts,
+              kilometres, heart-rate, recovery. Real-time feedback. Dynamic
+              workouts. The plan reshapes the moment your data does.
             </p>
 
             <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -156,9 +157,8 @@ function Hero() {
               </Link>
             </div>
 
-            <p className="mt-6 text-[11.5px] text-white/45">
-              14 days free. £5 a month after. The coaching elites pay £400 a
-              month for.
+            <p className="mt-6 text-[12px] text-white/55 font-semibold">
+              Most athletes will never train this way. The ones who win do.
             </p>
           </div>
 
@@ -483,8 +483,8 @@ function SocialProof() {
 function Features() {
   const items = [
     {
-      title: "Your data, every signal",
-      body: "Connect your wearables and training apps. Phantomcoach reads activities, fitness scores, sleep, HRV, and weight — every signal that informs today's call.",
+      title: "Every signal you generate",
+      body: "Activities, fitness scores, sleep, HRV, weight — every number your watch already captures, read every morning before today's call is made. Nothing logged manually.",
       visual: (
         <div className="flex items-center gap-2 flex-wrap">
           {["Garmin", "Strava", "Intervals.icu", "Wahoo", "Apple Health"].map(
@@ -505,8 +505,8 @@ function Features() {
       ),
     },
     {
-      title: "Science, not opinion",
-      body: "Every recommendation traces to published research — polarised intensity (Seiler), block periodisation (Issurin), ACWR injury thresholds, lactate-based protocols (Olbrecht). The frameworks elite coaches build careers on.",
+      title: "Every framework. Every paper.",
+      body: "Polarised intensity (Seiler). Block periodisation (Issurin). ACWR injury thresholds. Lactate protocols (Olbrecht). Every framework elite coaches build careers on, encoded into one coaching brain — read by the world's most capable AI.",
       visual: (
         <div className="space-y-2 text-[11.5px]">
           {[
@@ -524,8 +524,8 @@ function Features() {
       ),
     },
     {
-      title: "Action, every morning",
-      body: "Open the app. See the call. Train the session — with watts, paces, and HR ranges from your numbers. Ask anything. The plan reshapes when life shifts. Outcomes are made daily.",
+      title: "Real-time, every morning",
+      body: "Open the app. See today's call. Train the session — with watts, paces, HR ranges from your actual numbers. Feedback in real time. The plan reshapes the moment life shifts.",
       visual: (
         <div className="space-y-2 text-[11.5px]">
           {[
@@ -788,19 +788,18 @@ function HowItWorks() {
   );
 }
 
-function Pricing() {
-  const features = [
-    "Daily readiness call — GO, MODIFY, REST, with reasons",
-    "A plan calibrated to your timeline — six weeks to twelve months",
-    "Run, bike, swim, strength, mobility — sequenced as one programme",
-    "Adapts when life shifts — illness, travel, missed sessions",
-    "Coaching chat — your data, in context, on every reply",
-    "Performance and body composition tracking with projections",
+function FinalCTA() {
+  const inclusions = [
+    "Daily call — GO, MODIFY, REST — with reasons drawn from your numbers",
+    "A plan built backwards from race day — six weeks or twelve months",
+    "Run · bike · swim · strength · mobility, sequenced as one programme",
+    "Real-time feedback the moment your data updates",
+    "Plan reshapes when life shifts — illness, travel, missed sessions",
     "Workouts exportable to Garmin, Wahoo, Zwift, TrainingPeaks",
     "Sync from Garmin, Strava, Intervals.icu — no manual logging",
   ];
   return (
-    <section id="pricing" className="relative bg-black text-white overflow-hidden">
+    <section id="cta" className="relative bg-black text-white overflow-hidden">
       {/* Atmospheric gradient + glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div
@@ -811,39 +810,35 @@ function Pricing() {
           }}
         />
         <svg className="absolute inset-0 w-full h-full opacity-[0.04]" aria-hidden>
-          <filter id="grain-pricing">
+          <filter id="grain-cta">
             <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" />
           </filter>
-          <rect width="100%" height="100%" filter="url(#grain-pricing)" />
+          <rect width="100%" height="100%" filter="url(#grain-cta)" />
         </svg>
       </div>
 
       <div className="relative max-w-6xl mx-auto w-full px-6 py-24 sm:py-32">
-        <div className="max-w-3xl mx-auto text-center mb-14">
+        <div className="max-w-3xl mx-auto text-center mb-12">
           <div className="text-[10.5px] uppercase tracking-[0.18em] text-accent font-extrabold mb-4">
-            Pricing
+            Train like the people who win
           </div>
           <h2 className="font-black tracking-[-0.035em] leading-[0.95] text-[2.6rem] sm:text-[3.6rem] text-white">
-            Elite frameworks.
+            Every paper.
             <br />
-            <span className="text-accent">Coffee money.</span>
+            <span className="text-accent">Every framework.</span>
+            <br />
+            Yours, every morning.
           </h2>
-          <p className="mt-6 text-[14.5px] sm:text-[15.5px] text-white/70 leading-relaxed max-w-xl mx-auto">
-            A human coach is £200 to £600 a month. Phantomcoach is £5. Same
-            frameworks. Faster. Always on.
+          <p className="mt-7 text-[15px] sm:text-[16.5px] text-white/75 leading-relaxed max-w-xl mx-auto">
+            The coaching elites pay thousands for — read by the world&apos;s most
+            capable AI, applied to your data, recalibrated daily. You can train
+            without it. The athletes who win don&apos;t.
           </p>
         </div>
 
         <div className="max-w-md mx-auto bg-white/[0.04] border border-white/15 backdrop-blur-sm rounded-xl p-9 shadow-[0_30px_80px_rgba(193,68,14,0.18)]">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-6xl font-black tracking-[-0.04em] text-white">£5</span>
-            <span className="text-white/50 text-sm">/ month</span>
-          </div>
-          <div className="text-[12px] text-white/50 mb-7">
-            14 days free · cancel anytime
-          </div>
-          <ul className="space-y-3 mb-8 text-[13px] text-white/80">
-            {features.map((f, i) => (
+          <ul className="space-y-3 mb-8 text-[13px] text-white/85">
+            {inclusions.map((f, i) => (
               <li key={i} className="flex items-start gap-2.5">
                 <span className="size-4 rounded-full bg-accent/20 border border-accent text-accent flex items-center justify-center flex-shrink-0 mt-0.5">
                   <CheckIcon size={9} />
@@ -856,8 +851,11 @@ function Pricing() {
             href="/onboarding"
             className="block text-center px-5 py-3.5 bg-accent hover:bg-accent-h text-white text-[13.5px] font-bold rounded-md transition shadow-[0_8px_24px_rgba(193,68,14,0.4)]"
           >
-            Start 14-day free trial
+            Build my plan · 5 minutes →
           </Link>
+          <p className="mt-3 text-center text-[11px] text-white/45">
+            Connect your data. Set your goal. Train differently from tomorrow.
+          </p>
         </div>
       </div>
     </section>
@@ -896,15 +894,11 @@ function FAQ() {
     },
     {
       q: "Does this replace a human coach?",
-      a: "For most age-groupers chasing a half ironman, marathon PB, or strength target — yes. For elites with sponsor obligations, biomechanical complexity, or in-person form coaching needs — no, but it's a strong second opinion at a fraction of the cost.",
+      a: "For most age-groupers chasing a half ironman, marathon PB, or strength target — yes. For elites with sponsor obligations, biomechanical complexity, or in-person form coaching needs — no, but it's a relentless second opinion that never sleeps.",
     },
     {
       q: "Where does my data go?",
       a: "Connections are encrypted at rest. Phantomcoach reads on demand, sends relevant slices to Anthropic for coaching responses, and stores the latest snapshot for fast loads. Delete your account and it's gone. No archives. No resale.",
-    },
-    {
-      q: "Can I cancel?",
-      a: "One click in settings. Your data stays for 30 days. After that it's deleted.",
     },
   ];
   return (
