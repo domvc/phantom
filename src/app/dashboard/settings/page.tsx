@@ -7,6 +7,7 @@ import {
   getUserState,
   setUserState,
   type AthleteNotes,
+  type RaceGoal,
   type UserState,
 } from "@/lib/storage";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -178,36 +179,7 @@ export default function SettingsPage() {
 
       {/* Race goal */}
       <Section title="Race Goals">
-        {user.raceGoal ? (
-          <div className="bg-surface border border-border-soft rounded-md p-5 flex items-start gap-4">
-            <div className="size-10 rounded-md bg-accent-soft border border-accent-mid flex items-center justify-center flex-shrink-0">
-              <FlagIcon size={18} className="text-accent" />
-            </div>
-            <div className="flex-1">
-              <div className="font-bold text-[15px] tracking-tight">
-                {user.raceGoal.name}
-              </div>
-              <div className="text-[12px] text-text-muted mt-0.5">
-                {user.raceGoal.type} · {user.raceGoal.date} · target {user.raceGoal.targetTime}
-              </div>
-              {user.raceGoal.notes && (
-                <div className="text-[12.5px] text-text-mid mt-2 leading-relaxed">
-                  {user.raceGoal.notes}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => alert("Goal editing coming next")}
-              className="text-[12px] px-3 py-1.5 border border-border hover:border-accent hover:text-accent text-text-mid rounded-md transition"
-            >
-              Edit
-            </button>
-          </div>
-        ) : (
-          <div className="bg-surface border border-dashed border-border rounded-md p-8 text-center text-[13px] text-text-muted">
-            No race goal set
-          </div>
-        )}
+        <RaceGoalEditor user={user} onSaved={() => setUser(getUserState())} />
       </Section>
 
       {/* Account / sign-out (only shown when auth is configured) */}
@@ -325,6 +297,222 @@ function ConnectionCard({
           {status === "connected" ? "Connected" : "Active"}
         </span>
       )}
+    </div>
+  );
+}
+
+const RACE_TYPES: RaceGoal["type"][] = [
+  "5K",
+  "10K",
+  "HM",
+  "Marathon",
+  "Ultra",
+  "Olympic Tri",
+  "Half Ironman",
+  "Ironman",
+  "Other",
+];
+
+function RaceGoalEditor({
+  user,
+  onSaved,
+}: {
+  user: UserState;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<RaceGoal>(
+    user.raceGoal ?? {
+      name: "",
+      type: "Half Ironman",
+      date: "",
+      targetTime: "",
+      raceDetails: "",
+      notes: "",
+    }
+  );
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  // Reset draft when entering edit mode (so editing always starts from current)
+  function startEdit() {
+    setDraft(
+      user.raceGoal ?? {
+        name: "",
+        type: "Half Ironman",
+        date: "",
+        targetTime: "",
+        raceDetails: "",
+        notes: "",
+      }
+    );
+    setEditing(true);
+  }
+
+  function cancel() {
+    setEditing(false);
+  }
+
+  function save() {
+    if (!draft.name || !draft.date) return;
+    setUserState({ raceGoal: draft });
+    setEditing(false);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 2500);
+    onSaved();
+    window.dispatchEvent(new Event("phantomcoach:notes-updated"));
+  }
+
+  const showRaceDetails = draft.type === "Ultra" || draft.type === "Other";
+
+  if (!editing) {
+    if (!user.raceGoal) {
+      return (
+        <div className="bg-surface border border-dashed border-border rounded-md p-8 text-center text-[13px] text-text-muted">
+          No race goal set —{" "}
+          <button
+            onClick={startEdit}
+            className="text-accent font-semibold hover:underline"
+          >
+            add one
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="bg-surface border border-border-soft rounded-md p-5 flex items-start gap-4">
+        <div className="size-10 rounded-md bg-accent-soft border border-accent-mid flex items-center justify-center flex-shrink-0">
+          <FlagIcon size={18} className="text-accent" />
+        </div>
+        <div className="flex-1">
+          <div className="font-bold text-[15px] tracking-tight">
+            {user.raceGoal.name}
+          </div>
+          <div className="text-[12px] text-text-muted mt-0.5">
+            {user.raceGoal.type} ·{" "}
+            {new Date(user.raceGoal.date).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+            {user.raceGoal.targetTime ? ` · target ${user.raceGoal.targetTime}` : ""}
+          </div>
+          {user.raceGoal.raceDetails && (
+            <div className="text-[12.5px] text-text-mid mt-2 leading-relaxed">
+              <span className="text-text-muted">Format: </span>
+              {user.raceGoal.raceDetails}
+            </div>
+          )}
+          {savedFlash && (
+            <div className="mt-2 text-[11.5px] text-go font-semibold">
+              ✓ Saved — click Regenerate on the dashboard to refresh the plan
+            </div>
+          )}
+        </div>
+        <button
+          onClick={startEdit}
+          className="text-[12px] px-3 py-1.5 border border-border hover:border-accent hover:text-accent text-text-mid rounded-md transition"
+        >
+          Edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-surface border border-border rounded-md p-5 space-y-4">
+      <div>
+        <label className="block text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-bold mb-1.5">
+          Race name
+        </label>
+        <input
+          type="text"
+          value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          className="w-full px-3 py-2 bg-bg border border-border rounded-md text-[13px] focus:outline-none focus:border-accent transition"
+        />
+      </div>
+
+      <div>
+        <label className="block text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-bold mb-1.5">
+          Race type
+        </label>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {RACE_TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setDraft({ ...draft, type: t })}
+              className={`px-2 py-2 text-[11.5px] font-semibold rounded-md border transition ${
+                draft.type === t
+                  ? "bg-accent text-white border-accent"
+                  : "bg-bg text-text-mid border-border hover:border-accent hover:text-accent"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {showRaceDetails && (
+        <div>
+          <label className="block text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-bold mb-1.5">
+            {draft.type === "Ultra" ? "Ultra format & distance" : "Race details"}
+          </label>
+          <textarea
+            value={draft.raceDetails || ""}
+            onChange={(e) => setDraft({ ...draft, raceDetails: e.target.value })}
+            placeholder={draft.type === "Ultra" ? "e.g. Backyard ultra, 6.7km loops" : "Distance, format, terrain"}
+            rows={2}
+            className="w-full px-3 py-2 bg-bg border border-border rounded-md text-[13px] focus:outline-none focus:border-accent transition resize-none"
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-bold mb-1.5">
+            Race date
+          </label>
+          <input
+            type="date"
+            value={draft.date}
+            onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+            className="w-full px-3 py-2 bg-bg border border-border rounded-md text-[13px] focus:outline-none focus:border-accent transition"
+          />
+        </div>
+        <div>
+          <label className="block text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-bold mb-1.5">
+            Target time
+          </label>
+          <input
+            type="text"
+            value={draft.targetTime}
+            onChange={(e) => setDraft({ ...draft, targetTime: e.target.value })}
+            placeholder="4:45:00"
+            className="w-full px-3 py-2 bg-bg border border-border rounded-md font-mono text-[13px] focus:outline-none focus:border-accent transition"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 pt-1">
+        <button
+          onClick={save}
+          disabled={!draft.name || !draft.date}
+          className="px-4 py-2 bg-accent hover:bg-accent-h disabled:opacity-30 text-white text-[12px] font-semibold rounded-md transition"
+        >
+          Save race goal
+        </button>
+        <button
+          onClick={cancel}
+          className="px-4 py-2 border border-border hover:border-accent text-text-mid hover:text-accent text-[12px] font-semibold rounded-md transition"
+        >
+          Cancel
+        </button>
+        <span className="text-[11px] text-text-muted ml-auto">
+          You&apos;ll need to Regenerate your plan after saving.
+        </span>
+      </div>
     </div>
   );
 }

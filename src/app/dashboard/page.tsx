@@ -712,26 +712,63 @@ function PlanBanner({
     );
   }
 
+  // Detect plan staleness: if the current race goal's weeks-to-race differs
+  // from what's baked into the plan (or the plan's stored race date diverges
+  // from the current race goal), the plan needs regenerating.
+  const liveWeeksToRace = user.raceGoal?.date
+    ? Math.max(
+        1,
+        Math.ceil((new Date(user.raceGoal.date).getTime() - Date.now()) / (7 * 86_400_000))
+      )
+    : null;
+  const planRaceDate = plan.race?.date ?? null;
+  const liveRaceDate = user.raceGoal?.date ?? null;
+  const dateDiverged = !!planRaceDate && !!liveRaceDate && planRaceDate !== liveRaceDate;
+  const weeksDiverged =
+    liveWeeksToRace !== null && totalWeeks !== undefined && Math.abs(liveWeeksToRace - totalWeeks) > 1;
+  const isStale = dateDiverged || weeksDiverged;
+
+  const containerClass = isStale
+    ? "relative bg-accent-soft border border-accent-mid rounded-md p-4 mb-5 overflow-hidden"
+    : "relative bg-surface border border-border-soft rounded-md p-4 mb-5 overflow-hidden";
+  const buttonClass = isStale
+    ? "px-3 py-1.5 bg-accent hover:bg-accent-h text-white text-[11.5px] font-semibold rounded-md transition whitespace-nowrap shadow-sm"
+    : "px-3 py-1.5 border border-border hover:border-accent hover:text-accent disabled:opacity-50 text-text-mid text-[11.5px] font-semibold rounded-md transition whitespace-nowrap";
+
   return (
-    <div className="relative bg-surface border border-border-soft rounded-md p-4 mb-5 overflow-hidden">
+    <div className={containerClass}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-0.5">
             Your training plan
+            {isStale && (
+              <span className="ml-2 text-accent">· OUT OF DATE</span>
+            )}
           </div>
           <div className="text-[13px] font-bold tracking-tight text-text">
             {totalWeeks} weeks · {phasesCount} phases · {milestonesCount} milestones
           </div>
-          {generated && (
+          {generated && !isStale && (
             <div className="text-[10.5px] text-text-muted mt-0.5">
               {state === "generating" ? "Regenerating…" : `Generated ${generated}`}
             </div>
+          )}
+          {isStale && state !== "generating" && (
+            <div className="text-[11px] text-accent mt-1 font-medium leading-relaxed">
+              {dateDiverged
+                ? `Race date changed to ${formatRaceDate(liveRaceDate!)} — plan was built for ${formatRaceDate(planRaceDate!)}.`
+                : `Plan covers ${totalWeeks} weeks but race is ${liveWeeksToRace} weeks away.`}{" "}
+              Regenerate to refresh the phases.
+            </div>
+          )}
+          {state === "generating" && (
+            <div className="text-[10.5px] text-text-muted mt-0.5">Regenerating…</div>
           )}
         </div>
         <button
           onClick={onGenerate}
           disabled={state === "generating"}
-          className="px-3 py-1.5 border border-border hover:border-accent hover:text-accent disabled:opacity-50 text-text-mid text-[11.5px] font-semibold rounded-md transition whitespace-nowrap"
+          className={buttonClass}
         >
           {state === "generating" ? "Regenerating…" : "Regenerate"}
         </button>
@@ -757,4 +794,12 @@ function PlanBanner({
       `}</style>
     </div>
   );
+}
+
+function formatRaceDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
