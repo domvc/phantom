@@ -65,9 +65,10 @@ export default function SessionReconcileBanner({
 }: Props) {
   const [adapting, setAdapting] = useState<string | null>(null);
   const [adaptError, setAdaptError] = useState<string | null>(null);
+  const [adaptedToast, setAdaptedToast] = useState<string | null>(null);
 
   const visible = reconciliations.filter((r) => !r.dismissed && !r.adapted).slice(0, 3);
-  if (visible.length === 0) return null;
+  if (visible.length === 0 && !adaptedToast) return null;
 
   function dismiss(activityId: string) {
     patchReconciliation(activityId, { dismissed: true });
@@ -90,19 +91,10 @@ export default function SessionReconcileBanner({
     onAdaptStart?.();
 
     try {
-      const res = await fetch("/api/plan/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          synced: undefined, // server reads from request payload only — pass via patch flow below
-        }),
-      });
-      // The simpler path: just record the amendment locally and let the next plan-gen pick it up.
-      // We don't regenerate the plan immediately — that's a heavy operation. The amendment will
-      // be reflected next time the user explicitly clicks "Regenerate".
-      // For now, store the amendment and mark the reconciliation as adapted.
-      void res; // silence unused
-
+      // Record an amendment locally — picked up next time the user regenerates.
+      // We deliberately don't kick off plan-gen here: it's a 30-40s blocking call,
+      // and the user often wants to adapt several reconciliations at once before
+      // committing to a regen.
       const { setUserState, getUserState } = await import("@/lib/storage");
       const state = getUserState();
       const amendment = {
@@ -115,6 +107,10 @@ export default function SessionReconcileBanner({
         amendments: [...(state.amendments ?? []), amendment],
       });
       patchReconciliation(rec.activityId, { adapted: true });
+      setAdaptedToast(
+        "Recorded. Click Regenerate on your plan to bake the change in."
+      );
+      setTimeout(() => setAdaptedToast(null), 6000);
       window.dispatchEvent(new Event("phantomcoach:reconciliation-changed"));
     } catch (e) {
       setAdaptError(e instanceof Error ? e.message : "Failed to record adaptation");
@@ -196,6 +192,12 @@ export default function SessionReconcileBanner({
           </div>
         );
       })}
+      {adaptedToast && (
+        <div className="rounded-md border border-go/30 bg-go-soft px-4 py-2 text-[12px] text-go font-semibold flex items-center gap-2">
+          <span className="size-1.5 rounded-full bg-go" />
+          {adaptedToast}
+        </div>
+      )}
       {adaptError && (
         <div className="text-[12px] text-modify px-2">⚠️ {adaptError}</div>
       )}
