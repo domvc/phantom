@@ -196,14 +196,14 @@ export default function AmendmentChatModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm"
       onClick={() => phase !== "regenerating" && onClose()}
     >
       <div
-        className="bg-bg border border-border rounded-lg max-w-2xl w-full h-[80vh] overflow-hidden flex flex-col shadow-2xl"
+        className="bg-bg border border-border rounded-t-2xl sm:rounded-lg max-w-2xl w-full h-[92vh] sm:h-[80vh] overflow-hidden flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-7 py-4 border-b border-border-soft flex items-start justify-between gap-4 flex-shrink-0">
+        <div className="px-4 sm:px-7 py-4 border-b border-border-soft flex items-start justify-between gap-3 sm:gap-4 flex-shrink-0">
           <div>
             <div className="text-[10px] uppercase tracking-[0.12em] text-accent font-bold mb-1">
               Amend plan · {weekContext}
@@ -225,7 +225,7 @@ export default function AmendmentChatModal({
         </div>
 
         {/* Body */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-3">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
           {messages.length === 0 && !streaming && (
             <div className="space-y-3">
               <div className="text-[13px] text-text-mid leading-relaxed">

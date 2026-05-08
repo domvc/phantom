@@ -239,15 +239,15 @@ export default function WorkoutDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-bg border border-border rounded-lg max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
+        className="bg-bg border border-border rounded-t-2xl sm:rounded-lg max-w-2xl w-full max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-7 py-5 border-b border-border-soft flex items-start justify-between gap-4">
+        <div className="px-4 sm:px-7 py-4 sm:py-5 border-b border-border-soft flex items-start justify-between gap-3 sm:gap-4">
           <div className="flex-1">
             <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-1">
               {day}
@@ -303,28 +303,29 @@ export default function WorkoutDetailModal({
           </div>
         </div>
         {pwxError && (
-          <div className="px-7 py-2 text-[11.5px] text-modify bg-modify-soft border-b border-modify/20">
+          <div className="px-4 sm:px-7 py-2 text-[11.5px] text-modify bg-modify-soft border-b border-modify/20">
             ⚠️ {pwxError}
           </div>
         )}
 
         {/* Tabs */}
-        <div className="px-7 border-b border-border-soft flex gap-1">
+        <div className="px-4 sm:px-7 border-b border-border-soft flex gap-1 overflow-x-auto no-scrollbar">
           {[
-            { id: "detail" as const, label: "Detail" },
-            { id: "garmin" as const, label: "Copy for Garmin / Wahoo" },
-            { id: "tp" as const, label: "Copy for TrainingPeaks" },
+            { id: "detail" as const, label: "Detail", short: "Detail" },
+            { id: "garmin" as const, label: "Copy for Garmin / Wahoo", short: "Garmin" },
+            { id: "tp" as const, label: "Copy for TrainingPeaks", short: "TrainingPeaks" },
           ].map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-3 py-2.5 text-[12px] font-semibold transition border-b-2 ${
+              className={`px-3 py-2.5 text-[12px] font-semibold transition border-b-2 whitespace-nowrap flex-shrink-0 ${
                 tab === t.id
                   ? "border-accent text-accent"
                   : "border-transparent text-text-muted hover:text-text"
               }`}
             >
-              {t.label}
+              <span className="sm:hidden">{t.short}</span>
+              <span className="hidden sm:inline">{t.label}</span>
             </button>
           ))}
         </div>
@@ -332,11 +333,11 @@ export default function WorkoutDetailModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
           {error && (
-            <div className="p-7 text-[13px] text-modify">⚠️ {error}</div>
+            <div className="p-4 sm:p-7 text-[13px] text-modify">⚠️ {error}</div>
           )}
 
           {tab === "detail" && (
-            <div className="p-7 space-y-5">
+            <div className="p-4 sm:p-7 space-y-4 sm:space-y-5">
               <Block label="Warm-up" streaming={streaming && !detail.warmup}>
                 {detail.warmup ? (
                   <pre className="whitespace-pre-wrap font-sans text-[13px] text-text leading-relaxed">
@@ -518,7 +519,7 @@ function CopyBlock({
   onCopy: () => void;
 }) {
   return (
-    <div className="p-7 space-y-3">
+    <div className="p-4 sm:p-7 space-y-3">
       <p className="text-[12px] text-text-muted">{note}</p>
       <div className="bg-surface border border-border-soft rounded-md p-4 max-h-[40vh] overflow-y-auto min-h-[120px]">
         {text ? (

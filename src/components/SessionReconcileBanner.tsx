@@ -134,57 +134,59 @@ export default function SessionReconcileBanner({
         return (
           <div
             key={rec.activityId}
-            className={`rounded-lg border ${style.border} ${style.bg} px-5 py-4 flex items-start gap-4`}
+            className={`rounded-lg border ${style.border} ${style.bg} px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4`}
           >
-            <div
-              className={`flex-shrink-0 size-9 rounded-full bg-bg border ${style.border} flex items-center justify-center`}
-            >
-              <SportGlyph sport={rec.activitySport} />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2 flex-wrap mb-1">
-                <span
-                  className={`text-[10px] uppercase tracking-[0.12em] font-bold ${style.labelClass}`}
-                >
-                  {style.label}
-                </span>
-                <span className="text-[11px] text-text-muted">· {dateLabel}</span>
+            <div className="flex items-start gap-3 sm:contents">
+              <div
+                className={`flex-shrink-0 size-9 rounded-full bg-bg border ${style.border} flex items-center justify-center`}
+              >
+                <SportGlyph sport={rec.activitySport} />
               </div>
-              <div className="text-[13.5px] font-semibold text-text mb-0.5">
-                {rec.activityName}
-                {rec.durationMin ? (
-                  <span className="text-text-muted font-normal">
-                    {" "}
-                    · {Math.round(rec.durationMin)}min
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 flex-wrap mb-1">
+                  <span
+                    className={`text-[10px] uppercase tracking-[0.12em] font-bold ${style.labelClass}`}
+                  >
+                    {style.label}
                   </span>
-                ) : null}
-                {rec.tss ? (
-                  <span className="text-text-muted font-normal"> · {rec.tss} TSS</span>
-                ) : null}
+                  <span className="text-[11px] text-text-muted">· {dateLabel}</span>
+                </div>
+                <div className="text-[13.5px] font-semibold text-text mb-0.5">
+                  {rec.activityName}
+                  {rec.durationMin ? (
+                    <span className="text-text-muted font-normal">
+                      {" "}
+                      · {Math.round(rec.durationMin)}min
+                    </span>
+                  ) : null}
+                  {rec.tss ? (
+                    <span className="text-text-muted font-normal"> · {rec.tss} TSS</span>
+                  ) : null}
+                </div>
+                <p className="text-[12.5px] text-text-mid leading-relaxed">{rec.message}</p>
+                {rec.plannedTitle && (
+                  <p className="text-[11px] text-text-muted mt-1">
+                    Plan said:{" "}
+                    <span className="line-through">{rec.plannedTitle}</span>
+                  </p>
+                )}
               </div>
-              <p className="text-[12.5px] text-text-mid leading-relaxed">{rec.message}</p>
-              {rec.plannedTitle && (
-                <p className="text-[11px] text-text-muted mt-1">
-                  Plan said:{" "}
-                  <span className="line-through">{rec.plannedTitle}</span>
-                </p>
-              )}
             </div>
 
-            <div className="flex flex-col gap-1.5 flex-shrink-0">
+            <div className="flex flex-row sm:flex-col gap-2 sm:gap-1.5 sm:flex-shrink-0">
               {canAdapt && (
                 <button
                   onClick={() => adaptWeek(rec)}
                   disabled={adapting === rec.activityId}
-                  className="text-[11.5px] font-semibold px-3 py-1.5 bg-accent hover:bg-accent-h disabled:opacity-50 text-white rounded-md transition"
+                  className="flex-1 sm:flex-none text-[11.5px] font-semibold px-3 py-2 sm:py-1.5 bg-accent hover:bg-accent-h disabled:opacity-50 text-white rounded-md transition whitespace-nowrap"
                 >
                   {adapting === rec.activityId ? "Adapting…" : "Adapt the week"}
                 </button>
               )}
               <button
                 onClick={() => dismiss(rec.activityId)}
-                className="text-[11px] font-semibold px-3 py-1.5 text-text-muted hover:text-text transition"
+                className="flex-1 sm:flex-none text-[11px] font-semibold px-3 py-2 sm:py-1.5 text-text-muted hover:text-text transition whitespace-nowrap"
               >
                 Dismiss
               </button>

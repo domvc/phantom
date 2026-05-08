@@ -105,31 +105,32 @@ export default function CalendarPage() {
     <>
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-8 pt-7 pb-4 flex-shrink-0">
-          <div className="flex items-baseline justify-between gap-4 flex-wrap">
-            <div>
+        <div className="px-4 sm:px-8 pt-5 sm:pt-7 pb-3 sm:pb-4 flex-shrink-0">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-1">
                 Weekly schedule · current · {WEEKS_FWD} ahead
               </div>
-              <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Calendar</h1>
             </div>
             <button
               onClick={() => setShowRecent((s) => !s)}
-              className="px-3 py-1.5 text-[12px] font-semibold rounded-md border border-border-soft hover:border-accent hover:text-accent text-text-mid transition flex items-center gap-2"
+              className="px-3 py-2 sm:py-1.5 text-[12px] font-semibold rounded-md border border-border-soft hover:border-accent hover:text-accent text-text-mid transition flex items-center gap-2 whitespace-nowrap"
               title={showRecent ? "Hide the last two weeks" : "Show the last two weeks of training"}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
-              {showRecent ? "Hide recent workouts" : "See recent workouts"}
+              <span className="hidden sm:inline">{showRecent ? "Hide recent workouts" : "See recent workouts"}</span>
+              <span className="sm:hidden">{showRecent ? "Hide past" : "Show past"}</span>
             </button>
           </div>
         </div>
 
         {/* Scroll container with weeks */}
-        <div className="flex-1 overflow-y-auto px-8 pb-12">
-          <div className="space-y-6 max-w-[1400px]">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 pb-12">
+          <div className="space-y-6 sm:space-y-8 max-w-[1400px]">
             {weeks.map((w, i) => (
               <WeekRow
                 key={i}
@@ -343,8 +344,8 @@ function WeekRow({
   return (
     <div ref={ref} className="scroll-mt-4">
       {/* Week label strip */}
-      <div className="flex items-center justify-between mb-2 gap-3">
-        <div className="flex items-baseline gap-3 flex-wrap">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 mb-3">
+        <div className="flex items-baseline gap-2 flex-wrap">
           <div
             className={`text-[11px] uppercase tracking-[0.1em] font-bold ${
               isCurrent ? "text-accent" : isPast ? "text-text-muted" : "text-text-mid"
@@ -359,7 +360,7 @@ function WeekRow({
           </div>
           {phase && (
             <div
-              className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full ${
+              className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
                 isCurrent
                   ? "bg-accent-soft text-accent border border-accent-mid"
                   : "bg-surface-2 text-text-muted border border-border"
@@ -378,7 +379,7 @@ function WeekRow({
           <button
             onClick={handleCopy}
             title={`Copy week of ${dateLabel} as text`}
-            className="px-2.5 py-1 text-[11px] font-semibold rounded border border-border-soft hover:border-accent hover:text-accent text-text-muted transition flex items-center gap-1.5"
+            className="px-2.5 py-1.5 sm:py-1 text-[11px] font-semibold rounded border border-border-soft hover:border-accent hover:text-accent text-text-muted transition flex items-center gap-1.5"
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -389,7 +390,7 @@ function WeekRow({
           <button
             onClick={handleCsv}
             title={`Download week of ${dateLabel} as CSV`}
-            className="px-2.5 py-1 text-[11px] font-semibold rounded border border-border-soft hover:border-accent hover:text-accent text-text-muted transition flex items-center gap-1.5"
+            className="px-2.5 py-1.5 sm:py-1 text-[11px] font-semibold rounded border border-border-soft hover:border-accent hover:text-accent text-text-muted transition flex items-center gap-1.5"
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -401,13 +402,28 @@ function WeekRow({
         </div>
       </div>
 
-      {/* 7 days + summary side-by-side */}
+      {/* Mobile: summary appears at the top of each week so the week's brief is
+          visible before scrolling through 7 day rows. Desktop: lives in the
+          right-hand column instead (rendered below). */}
+      <div className={`md:hidden mb-3 ${isPast ? "opacity-55" : ""}`}>
+        <WeekSummary
+          user={user}
+          monday={monday}
+          weekStartIso={weekStartIso}
+          phase={phase}
+          isPast={isPast}
+          isCurrent={isCurrent}
+          onAmend={() => onAmend(weekContext, weekStartIso)}
+        />
+      </div>
+
+      {/* 7 days + summary side-by-side on md+, stacked on mobile */}
       <div
-        className={`grid gap-3 ${isPast ? "opacity-55" : ""}`}
+        className={`md:grid md:gap-3 ${isPast ? "opacity-55" : ""}`}
         style={{ gridTemplateColumns: "minmax(0, 1fr) 260px" }}
       >
-        {/* 7 day columns */}
-        <div className="grid grid-cols-7 gap-2">
+        {/* Days: vertical stack on mobile, 7-col grid on md+ */}
+        <div className="flex flex-col gap-3 md:grid md:grid-cols-7 md:gap-2">
           {DAY_KEYS.map((key, i) => {
             const date = new Date(monday);
             date.setDate(monday.getDate() + i);
@@ -440,7 +456,6 @@ function WeekRow({
                   isDropTarget ? "ring-2 ring-accent ring-offset-1 ring-offset-bg" : ""
                 } ${isDragSource ? "opacity-60" : ""}`}
                 onDragOver={(e) => {
-                  // Allow drop only if we're dragging something from a different day
                   if (dragSourceKey && dragSourceKey !== key) {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
@@ -471,20 +486,21 @@ function WeekRow({
                   setDragSourceKey(null);
                 }}
               >
+                {/* Day header — horizontal with full date on mobile, centered column on md+ */}
                 <div
-                  className={`text-center pb-2 border-b mb-2 ${
+                  className={`flex items-baseline gap-2 pb-1.5 md:pb-2 mb-2 border-b md:flex-col md:items-center md:gap-0 md:text-center ${
                     isToday ? "border-accent" : "border-border-soft"
                   }`}
                 >
                   <div
-                    className={`text-[9px] font-bold uppercase tracking-[0.1em] ${
+                    className={`text-[10px] md:text-[9px] font-bold uppercase tracking-[0.1em] ${
                       isToday ? "text-accent" : "text-text-muted"
                     }`}
                   >
                     {DAY_ABBR[i]}
                   </div>
                   <div
-                    className={`text-[15px] font-bold mt-0.5 ${
+                    className={`text-[15px] font-bold md:mt-0.5 ${
                       isToday
                         ? "text-accent"
                         : date < today
@@ -492,8 +508,16 @@ function WeekRow({
                         : "text-text-mid"
                     }`}
                   >
-                    {date.getDate()}
+                    <span className="md:hidden">
+                      {date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </span>
+                    <span className="hidden md:inline">{date.getDate()}</span>
                   </div>
+                  {isToday && (
+                    <div className="md:hidden ml-auto text-[9px] uppercase tracking-[0.12em] font-bold text-accent bg-accent-soft px-1.5 py-0.5 rounded">
+                      Today
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -543,16 +567,18 @@ function WeekRow({
           })}
         </div>
 
-        {/* Right-side summary panel */}
-        <WeekSummary
-          user={user}
-          monday={monday}
-          weekStartIso={weekStartIso}
-          phase={phase}
-          isPast={isPast}
-          isCurrent={isCurrent}
-          onAmend={() => onAmend(weekContext, weekStartIso)}
-        />
+        {/* Right-side summary panel — md+ only; mobile renders this above */}
+        <div className="hidden md:block">
+          <WeekSummary
+            user={user}
+            monday={monday}
+            weekStartIso={weekStartIso}
+            phase={phase}
+            isPast={isPast}
+            isCurrent={isCurrent}
+            onAmend={() => onAmend(weekContext, weekStartIso)}
+          />
+        </div>
       </div>
     </div>
   );
@@ -1054,12 +1080,12 @@ function phaseForDate(phases: PlanPhase[] | undefined, d: Date): PlanPhase | nul
 
 function NoPlanCallout() {
   return (
-    <div className="flex-1 overflow-y-auto p-8 max-w-6xl">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-6xl">
       <div className="text-[11px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-2">
         Weekly schedule
       </div>
-      <h1 className="text-3xl font-bold tracking-tight mb-8">Calendar</h1>
-      <div className="bg-accent-soft border border-accent-mid rounded-md p-8 text-center">
+      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6 sm:mb-8">Calendar</h1>
+      <div className="bg-accent-soft border border-accent-mid rounded-md p-6 sm:p-8 text-center">
         <div className="size-12 rounded-full bg-bg border border-accent-mid flex items-center justify-center mx-auto mb-3">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-accent" aria-hidden>
             <rect x="3" y="4" width="18" height="18" rx="2" />

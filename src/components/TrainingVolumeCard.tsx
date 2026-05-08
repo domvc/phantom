@@ -55,7 +55,7 @@ export default function TrainingVolumeCard({ activities, syncedAt }: Props) {
 
   if (!activities || activities.length === 0) {
     return (
-      <div className="bg-surface border border-border-soft rounded-md p-6 mb-5">
+      <div className="bg-surface border border-border-soft rounded-md p-4 sm:p-6 mb-5">
         <div className="text-[11px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-2">
           Training volume
         </div>

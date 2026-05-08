@@ -19,6 +19,7 @@ export default function DashboardLayout({
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!cloud.ready) return;
@@ -38,10 +39,26 @@ export default function DashboardLayout({
     setReady(true);
   }, [router, cloud.ready, cloud.configured, cloud.user]);
 
+  // Close mobile drawer on route change so it doesn't persist after navigation.
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  // Close drawer on Escape key.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawerOpen]);
+
   async function handleSync() {
     const s = getUserState();
     if (!s.intervals) {
       setSyncMsg("Not connected");
+      setTimeout(() => setSyncMsg(null), 2500);
       return;
     }
     setSyncing(true);
@@ -58,6 +75,7 @@ export default function DashboardLayout({
       const data = await res.json();
       if (!data.ok) {
         setSyncMsg(data.error || "Sync failed");
+        setTimeout(() => setSyncMsg(null), 3500);
       } else {
         setUserState({ synced: data });
         setSyncMsg("✓ Data synced");
@@ -66,7 +84,6 @@ export default function DashboardLayout({
         setTimeout(() => setSyncMsg(null), 2500);
 
         // Background reconciliation: classify any new activities against the plan.
-        // Non-blocking; UI updates via the reconciliation-changed event.
         runReconciliationsAfterSync()
           .then((result) => {
             if (result.newReconciliations.length > 0) {
@@ -79,6 +96,7 @@ export default function DashboardLayout({
       }
     } catch (e) {
       setSyncMsg(e instanceof Error ? e.message : "Network error");
+      setTimeout(() => setSyncMsg(null), 3500);
     } finally {
       setSyncing(false);
     }
@@ -99,75 +117,149 @@ export default function DashboardLayout({
     { href: "/dashboard/settings", label: "Settings", icon: setIcon },
   ];
 
-  return (
-    <div className="flex flex-1 min-h-0 h-screen overflow-hidden">
-      <aside className="w-48 flex-shrink-0 bg-surface border-r border-border-soft flex flex-col h-screen">
-        <div className="px-5 py-5 border-b border-border-soft">
-          <Link href="/" className="text-[14px]">
-            <PhantomLogo size={18} />
-          </Link>
-          <div className="text-[10px] text-text-muted mt-1.5 ml-[26px]">
-            Demo workspace
-          </div>
+  const sidebarInner = (
+    <>
+      <div className="px-5 py-5 border-b border-border-soft">
+        <Link href="/" className="text-[14px]">
+          <PhantomLogo size={18} />
+        </Link>
+        <div className="text-[10px] text-text-muted mt-1.5 ml-[26px]">
+          Demo workspace
         </div>
-        <nav className="flex-1 p-2.5 flex flex-col gap-0.5 overflow-y-auto">
-          {nav.map((item) => {
-            const active =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-[12.5px] transition ${
-                  active
-                    ? "bg-accent-soft text-accent font-semibold"
-                    : "text-text-muted hover:bg-surface-2 hover:text-text"
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            );
-          })}
-          <div className="mt-3 pt-3 border-t border-border-soft">
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="w-full flex items-center gap-2.5 px-3 py-2 bg-accent hover:bg-accent-h disabled:opacity-50 text-white text-[12px] font-semibold rounded-md transition"
+      </div>
+      <nav className="flex-1 p-2.5 flex flex-col gap-0.5 overflow-y-auto">
+        {nav.map((item) => {
+          const active =
+            item.href === "/dashboard"
+              ? pathname === "/dashboard"
+              : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-2.5 px-3 py-2.5 md:py-2 rounded-md text-[13.5px] md:text-[12.5px] transition ${
+                active
+                  ? "bg-accent-soft text-accent font-semibold"
+                  : "text-text-muted hover:bg-surface-2 hover:text-text"
+              }`}
             >
-              <SyncIcon size={14} className={syncing ? "animate-spin" : ""} />
-              {syncing ? "Syncing…" : "Sync data"}
-            </button>
-            {syncMsg && (
-              <div className="mt-1.5 text-[10.5px] text-center text-text-muted">
-                {syncMsg}
-              </div>
-            )}
-          </div>
-        </nav>
-        {/* Auth status footer */}
-        <div className="px-3 py-2.5 border-t border-border-soft text-[10px] text-text-muted">
-          {!cloud.configured ? (
-            <span title="Data lives in this browser only — see SUPABASE_SETUP.md to enable cloud sync">
-              Demo mode · local only
-            </span>
-          ) : cloud.user ? (
-            <span className="truncate block" title={cloud.user.email ?? undefined}>
-              ☁ {cloud.user.email}
-            </span>
-          ) : (
-            <span>Not signed in</span>
+              {item.icon}
+              {item.label}
+            </Link>
+          );
+        })}
+        <div className="mt-3 pt-3 border-t border-border-soft">
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 md:py-2 bg-accent hover:bg-accent-h disabled:opacity-50 text-white text-[13px] md:text-[12px] font-semibold rounded-md transition"
+          >
+            <SyncIcon size={14} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Syncing…" : "Sync data"}
+          </button>
+          {syncMsg && (
+            <div className="mt-1.5 text-[10.5px] text-center text-text-muted">
+              {syncMsg}
+            </div>
           )}
         </div>
+      </nav>
+      {/* Auth status footer */}
+      <div className="px-3 py-2.5 border-t border-border-soft text-[10px] text-text-muted">
+        {!cloud.configured ? (
+          <span title="Data lives in this browser only — see SUPABASE_SETUP.md to enable cloud sync">
+            Demo mode · local only
+          </span>
+        ) : cloud.user ? (
+          <span className="truncate block" title={cloud.user.email ?? undefined}>
+            ☁ {cloud.user.email}
+          </span>
+        ) : (
+          <span>Not signed in</span>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex flex-1 min-h-0 h-screen overflow-hidden">
+      {/* Mobile top app bar (visible <md). Sticky so content scrolls underneath. */}
+      <header className="md:hidden fixed top-0 inset-x-0 z-30 h-14 bg-surface border-b border-border-soft flex items-center justify-between px-3 pr-4">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open menu"
+          className="size-10 flex items-center justify-center rounded-md hover:bg-surface-2 active:bg-surface-2 text-text"
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <line x1="3" y1="7" x2="21" y2="7" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="17" x2="21" y2="17" />
+          </svg>
+        </button>
+        <Link href="/" className="text-[13px] flex items-center">
+          <PhantomLogo size={17} />
+        </Link>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          aria-label="Sync data"
+          className="size-10 flex items-center justify-center rounded-md text-accent hover:bg-accent-soft disabled:opacity-50 transition"
+        >
+          <SyncIcon size={18} className={syncing ? "animate-spin" : ""} />
+        </button>
+      </header>
+
+      {/* Mobile sync toast (no sidebar to live in) */}
+      {syncMsg && (
+        <div className="md:hidden fixed top-16 left-1/2 -translate-x-1/2 z-40 bg-text text-bg text-[12px] font-semibold px-3 py-1.5 rounded-full shadow-lg">
+          {syncMsg}
+        </div>
+      )}
+
+      {/* Mobile drawer backdrop */}
+      {drawerOpen && (
+        <button
+          aria-label="Close menu"
+          onClick={() => setDrawerOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-text/40 backdrop-blur-[1px] animate-[fade-in_0.15s_ease-out]"
+        />
+      )}
+
+      {/* Sidebar — drawer on mobile, fixed column on md+ */}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-50 w-64 md:w-48 flex-shrink-0 bg-surface border-r border-border-soft flex flex-col h-screen transition-transform duration-200 ease-out md:transition-none ${
+          drawerOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        {sidebarInner}
       </aside>
-      <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
+
+      {/* Main content — top-padded on mobile to clear the fixed app bar */}
+      <div className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0">
+        {children}
+      </div>
+
+      <style>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
 
-const iconBase = "w-3.5 h-3.5 flex-shrink-0";
+const iconBase = "w-4 h-4 md:w-3.5 md:h-3.5 flex-shrink-0";
 const dashIcon = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={iconBase}>
     <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />

@@ -217,7 +217,7 @@ export default function CoachChat({
 
   return (
     <div className="bg-surface border border-border-soft rounded-md flex flex-col h-[440px] relative">
-      <div className="px-5 py-3 border-b border-border-soft flex items-center justify-between flex-shrink-0">
+      <div className="px-4 sm:px-5 py-3 border-b border-border-soft flex items-center justify-between flex-shrink-0">
         <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold">
           Coach
         </div>
@@ -289,7 +289,7 @@ export default function CoachChat({
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
         {messages.length === 0 && !streaming && (
           <ChatGreeting plan={plan} raceGoal={raceGoal} synced={synced} onPick={send} />
         )}

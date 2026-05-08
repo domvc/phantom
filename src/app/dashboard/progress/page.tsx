@@ -27,11 +27,11 @@ export default function ProgressPage() {
   const today = new Date();
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 max-w-3xl">
+    <div className="flex-1 overflow-y-auto p-4 sm:p-8 max-w-3xl">
       <div className="text-[11px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-2">
         Race milestones
       </div>
-      <h1 className="text-3xl font-bold tracking-tight mb-8">Progress</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-6 sm:mb-8">Progress</h1>
 
       {!plan?.milestones?.length ? (
         <div className="bg-accent-soft border border-accent-mid rounded-md p-8 text-center">

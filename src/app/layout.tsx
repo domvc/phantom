@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -13,6 +13,13 @@ export const metadata: Metadata = {
   title: "MyGOAT — Elite AI coaching for endurance athletes",
   description:
     "Run, bike, swim, strength & mobility — one programme, calibrated to your timeline. Sync from Garmin, Strava, or Intervals.icu. Powered by Claude.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#FFFFFF",
 };
 
 export default function RootLayout({

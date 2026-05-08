@@ -109,7 +109,7 @@ export default function DashboardHome() {
     <>
       <ContextBar daysToRace={daysToRace} race={race} synced={synced} />
       <div className="flex-1 overflow-y-auto">
-        <div className="p-7 max-w-6xl">
+        <div className="p-4 sm:p-7 max-w-6xl">
           <div className="text-[11px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-2">
             Today ·{" "}
             {new Date().toLocaleDateString("en-GB", {
@@ -118,10 +118,10 @@ export default function DashboardHome() {
               month: "long",
             })}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-balance">
             {name}. Here&apos;s today.
           </h1>
-          <p className="text-text-mid text-[14px] mb-7">
+          <p className="text-text-mid text-[13px] sm:text-[14px] mb-5 sm:mb-7">
             {synced
               ? `Data read ${new Date(synced.synced_at).toLocaleString("en-GB", {
                   hour: "2-digit",
@@ -129,7 +129,7 @@ export default function DashboardHome() {
                   day: "numeric",
                   month: "short",
                 })}. Decisions follow below.`
-              : "Sync your data in the sidebar. The coach reads it before deciding anything."}
+              : "Tap Sync (top-right) when you're ready. The coach reads your data before deciding anything."}
           </p>
 
           {/* Session reconciliation banner — what you actually did vs the plan */}
@@ -141,7 +141,7 @@ export default function DashboardHome() {
           )}
 
           {/* 4-up hero: Readiness · Today's Session · Last Session · Nutrition */}
-          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-5">
             <ReadinessCard synced={synced} />
             <TodaysSessionCard synced={synced} user={user} />
             <LastSessionCard
@@ -187,8 +187,8 @@ export default function DashboardHome() {
           </div>
 
           {/* Chart + Recent Sessions */}
-          <div className="grid lg:grid-cols-3 gap-5 mb-10">
-            <div className="lg:col-span-2 bg-surface border border-border-soft rounded-md p-5">
+          <div className="grid lg:grid-cols-3 gap-4 sm:gap-5 mb-10">
+            <div className="lg:col-span-2 bg-surface border border-border-soft rounded-md p-4 sm:p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold">
                   Performance Trend · last 90 days
@@ -282,8 +282,8 @@ function ContextBar({
   synced?: SyncedData;
 }) {
   return (
-    <div className="border-b border-border-soft px-7 py-2.5 flex items-center justify-between bg-bg flex-shrink-0">
-      <div className="text-[12px] text-text-muted">
+    <div className="border-b border-border-soft px-4 sm:px-7 py-2 sm:py-2.5 bg-bg flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3">
+      <div className="text-[11.5px] sm:text-[12px] text-text-muted">
         <strong className="text-text-mid font-semibold">Demo workspace</strong> ·{" "}
         {synced ? (
           <span className="text-go font-semibold">● Synced</span>
@@ -291,19 +291,19 @@ function ContextBar({
           <span>Not yet synced</span>
         )}
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-1.5 sm:gap-2 -mx-1 px-1 overflow-x-auto sm:overflow-visible no-scrollbar">
         {synced?.derived?.phase && (
-          <span className="px-2.5 py-1 rounded-full bg-accent-soft border border-accent-mid text-accent text-[10.5px] font-semibold uppercase tracking-wide">
+          <span className="px-2.5 py-1 rounded-full bg-accent-soft border border-accent-mid text-accent text-[10.5px] font-semibold uppercase tracking-wide whitespace-nowrap flex-shrink-0">
             {synced.derived.phase}
           </span>
         )}
         {race && (
-          <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-text-muted text-[10.5px] font-semibold uppercase tracking-wide">
+          <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-text-muted text-[10.5px] font-semibold uppercase tracking-wide whitespace-nowrap flex-shrink-0">
             {race.type}
           </span>
         )}
         {daysToRace !== null && (
-          <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-text-muted text-[10.5px] font-semibold uppercase tracking-wide">
+          <span className="px-2.5 py-1 rounded-full bg-surface-2 border border-border text-text-muted text-[10.5px] font-semibold uppercase tracking-wide whitespace-nowrap flex-shrink-0">
             {daysToRace}d to race
           </span>
         )}
@@ -559,7 +559,7 @@ function MetricStrip({ synced }: { synced: SyncedData }) {
   });
 
   return (
-    <div className="bg-surface border border-border-soft rounded-md mb-5 flex overflow-visible">
+    <div className="bg-surface border border-border-soft rounded-md mb-5 flex overflow-x-auto md:overflow-visible no-scrollbar">
       <MetricChip
         label="CTL"
         value={f?.ctl?.toFixed(0) ?? "—"}
@@ -690,14 +690,14 @@ function PlanBanner({
 
   if (!plan) {
     return (
-      <div className="bg-accent-soft border border-accent-mid rounded-md p-5 mb-5 flex items-start gap-4">
-        <div className="size-9 rounded-md bg-bg border border-accent-mid flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="bg-accent-soft border border-accent-mid rounded-md p-4 sm:p-5 mb-5 flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+        <div className="size-9 rounded-md bg-bg border border-accent-mid flex items-center justify-center flex-shrink-0">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="text-accent" aria-hidden>
             <path d="M9 11 H15 M9 15 H13 M9 7 H15" />
             <rect x="5" y="3" width="14" height="18" rx="2" />
           </svg>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="font-bold text-[14px] text-accent">
             Generate your training plan
           </div>
@@ -709,7 +709,7 @@ function PlanBanner({
         <button
           onClick={onGenerate}
           disabled={state === "generating" || !user.raceGoal}
-          className="px-4 py-2 bg-accent hover:bg-accent-h disabled:opacity-50 disabled:cursor-not-allowed text-white text-[12px] font-semibold rounded-md transition whitespace-nowrap self-center"
+          className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-accent hover:bg-accent-h disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] sm:text-[12px] font-semibold rounded-md transition whitespace-nowrap sm:self-center"
         >
           {state === "generating" ? "Generating…" : "Generate Plan"}
         </button>
@@ -742,7 +742,7 @@ function PlanBanner({
 
   return (
     <div className={containerClass}>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-0.5">
             Your training plan
@@ -773,7 +773,7 @@ function PlanBanner({
         <button
           onClick={onGenerate}
           disabled={state === "generating"}
-          className={buttonClass}
+          className={`w-full sm:w-auto ${buttonClass}`}
         >
           {state === "generating" ? "Regenerating…" : "Regenerate"}
         </button>

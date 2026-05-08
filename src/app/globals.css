@@ -37,3 +37,29 @@ input::placeholder, textarea::placeholder {
   color: var(--color-text-muted);
   opacity: 0.45;
 }
+
+/* Hide scrollbars on horizontal-scroll utility containers (used for chip
+   rails and the metric strip on mobile). Content stays scrollable via
+   touch / wheel; the scrollbar just doesn't render. */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* Disable double-tap zoom on tappable elements — feels app-native on iOS
+   without breaking pinch-to-zoom on the rest of the page. */
+a, button { touch-action: manipulation; }
+
+/* iOS Safari forces a 1.1× zoom on focused inputs whose font-size is
+   under 16px. Locking inputs to ≥16px avoids that jarring zoom. */
+@media (max-width: 767px) {
+  input[type="email"],
+  input[type="password"],
+  input[type="text"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

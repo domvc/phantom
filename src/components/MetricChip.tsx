@@ -49,11 +49,12 @@ export default function MetricChip({
 
   return (
     <div
-      className="flex-1 px-4 py-3 text-center border-r border-border-soft last:border-r-0 relative cursor-help"
+      className="flex-shrink-0 min-w-[78px] flex-1 px-3 sm:px-4 py-3 text-center border-r border-border-soft last:border-r-0 relative cursor-help"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onFocus={() => setHover(true)}
       onBlur={() => setHover(false)}
+      onClick={() => setHover((h) => !h)}
       tabIndex={0}
     >
       <div className="text-[9.5px] font-bold tracking-[0.08em] uppercase text-text-muted">

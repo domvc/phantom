@@ -248,7 +248,7 @@ export default function SessionFeedbackModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border-soft flex items-start justify-between gap-3 flex-shrink-0">
+        <div className="px-4 sm:px-6 py-4 border-b border-border-soft flex items-start justify-between gap-3 flex-shrink-0">
           <div className="flex-1 min-w-0">
             <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-1">
               Last session ·{" "}
@@ -287,7 +287,7 @@ export default function SessionFeedbackModal({
         {/* Body — scrollable */}
         <div className="flex-1 overflow-y-auto">
           {/* Analysis */}
-          <div className="p-6 border-b border-border-soft space-y-4">
+          <div className="p-4 sm:p-6 border-b border-border-soft space-y-4">
             <div className="text-[10px] uppercase tracking-[0.12em] text-accent font-bold">
               Analysis
             </div>
@@ -310,7 +310,7 @@ export default function SessionFeedbackModal({
           </div>
 
           {/* Feedback chat */}
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="text-[10px] uppercase tracking-[0.12em] text-accent font-bold mb-3">
               Your take
             </div>
