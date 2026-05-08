@@ -190,17 +190,31 @@ export async function runReconciliationsAfterSync(maxBatch = 3): Promise<Reconci
   return { newReconciliations: newOnes, skipped };
 }
 
-/** Find a reconciliation for a specific date (used by today-card / calendar overlay). */
+/**
+ * Find ALL reconciliations for a specific date — used when an athlete logs
+ * more than one session in a day (e.g. AM strength + PM run, or a brick).
+ * Sorted most-recent first.
+ */
+export function reconciliationsForDate(
+  reconciliations: SessionReconciliation[] | undefined,
+  dateIso: string
+): SessionReconciliation[] {
+  if (!Array.isArray(reconciliations)) return [];
+  return reconciliations
+    .filter((r) => r.activityDate === dateIso)
+    .sort((a, b) => new Date(b.reconciledAt).getTime() - new Date(a.reconciledAt).getTime());
+}
+
+/**
+ * Find the single most recent reconciliation for a date — used by the
+ * dashboard "what you did" headline tile. For multi-session days, the
+ * calendar (which uses `reconciliationsForDate`) is the canonical view.
+ */
 export function reconciliationForDate(
   reconciliations: SessionReconciliation[] | undefined,
   dateIso: string
 ): SessionReconciliation | null {
-  if (!Array.isArray(reconciliations)) return null;
-  // If multiple, prefer the most recent (last reconciledAt)
-  const matches = reconciliations
-    .filter((r) => r.activityDate === dateIso)
-    .sort((a, b) => new Date(b.reconciledAt).getTime() - new Date(a.reconciledAt).getTime());
-  return matches[0] ?? null;
+  return reconciliationsForDate(reconciliations, dateIso)[0] ?? null;
 }
 
 /** Update a single reconciliation in place (e.g. dismiss / mark adapted). */

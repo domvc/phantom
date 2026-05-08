@@ -13,7 +13,7 @@ import {
 import { computeNutritionTargets } from "@/lib/nutrition";
 import { weekToText, weekToCsv, copyToClipboard, toLocalIso, type DayKey } from "@/lib/exports";
 import { downloadFile, safeFilename } from "@/lib/pwx";
-import { reconciliationForDate } from "@/lib/reconcile";
+import { reconciliationsForDate } from "@/lib/reconcile";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";
 import AmendmentChatModal from "@/components/AmendmentChatModal";
 import {
@@ -444,7 +444,8 @@ function WeekRow({
                 : dayPhase
                 ? [{ ...fallback, summary: "Rest" }]
                 : [fallback];
-            const dayReconciliation = reconciliationForDate(user.reconciliations, dateIso);
+            const dayReconciliations = reconciliationsForDate(user.reconciliations, dateIso);
+            const hasLogged = dayReconciliations.length > 0;
             const dayRace = (user.races ?? []).find((r) => r.date === dateIso);
             const isDropTarget = dragHoverKey === key && dragSourceKey !== null && dragSourceKey !== key;
             const isDragSource = dragSourceKey === key;
@@ -523,17 +524,18 @@ function WeekRow({
                 <div className="flex flex-col gap-1.5">
                   {/* Race-day banner — slots above sessions for the day */}
                   {dayRace && <RaceDayBanner race={dayRace} />}
-                  {/* If the day has a logged activity, show the actual card on top
-                      and shrink the planned card down to a struck-through marker. */}
-                  {dayReconciliation && (
-                    <ActualSessionCard reconciliation={dayReconciliation} />
-                  )}
+                  {/* If the day has logged activities, show each on top of the
+                      planned card. Multi-session days (AM strength + PM run,
+                      brick days) render every logged activity as its own card. */}
+                  {dayReconciliations.map((rec) => (
+                    <ActualSessionCard key={rec.activityId} reconciliation={rec} />
+                  ))}
                   {sessions.map((s, idx) => (
                     <SessionCard
                       key={idx}
                       session={s}
-                      muted={Boolean(dayReconciliation)}
-                      draggable={s.type !== "rest" && !dayReconciliation}
+                      muted={hasLogged}
+                      draggable={s.type !== "rest" && !hasLogged}
                       onDragStart={(e) => {
                         e.dataTransfer.setData(
                           "application/json",

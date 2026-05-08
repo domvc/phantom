@@ -12,7 +12,7 @@ import {
   type DailyRow,
   type SessionReconciliation,
 } from "@/lib/storage";
-import { reconciliationForDate } from "@/lib/reconcile";
+import { reconciliationsForDate } from "@/lib/reconcile";
 import { generatePlanFromState } from "@/lib/planGen";
 import PerfChart from "@/components/PerfChart";
 import CoachChat from "@/components/CoachChat";
@@ -377,9 +377,13 @@ function TodaysSessionCard({ synced, user }: { synced?: SyncedData; user: UserSt
     ? todaysSessions.find((s) => s.type !== "rest") ?? todaysSessions[0]
     : null;
 
-  // Did the athlete already complete a session today? If so, swap the card to
-  // reflect what they actually did (with the planned session shown as struck-through).
-  const todayReconciliation = reconciliationForDate(user.reconciliations, todayIso);
+  // Did the athlete already complete one or more sessions today? If so, swap
+  // the card to show what they actually did. For multi-session days we lead
+  // with the most recent and indicate the rest below — the calendar shows
+  // every logged activity in its day cell.
+  const todayReconciliations = reconciliationsForDate(user.reconciliations, todayIso);
+  const todayReconciliation = todayReconciliations[0] ?? null;
+  const extraLogged = Math.max(0, todayReconciliations.length - 1);
 
   const insight =
     !primarySession || primarySession.type === "rest"
@@ -425,7 +429,12 @@ function TodaysSessionCard({ synced, user }: { synced?: SyncedData; user: UserSt
             Plan said: <span className="line-through">{r.plannedTitle}</span>
           </div>
         )}
-        {Array.isArray(todaysSessions) && todaysSessions.length > 1 && (
+        {extraLogged > 0 && (
+          <div className="text-[11px] text-go font-semibold mb-3">
+            + {extraLogged} more session{extraLogged > 1 ? "s" : ""} logged today
+          </div>
+        )}
+        {Array.isArray(todaysSessions) && todaysSessions.length > 1 && extraLogged === 0 && (
           <div className="text-[11px] text-text-muted mb-3">
             {todaysSessions.length - 1} more session{todaysSessions.length > 2 ? "s" : ""} still scheduled today
           </div>
