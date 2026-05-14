@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  effectiveWeight,
+  effectiveWkg,
   getUserState,
   setUserState,
   type UserState,
@@ -160,7 +162,7 @@ export default function DashboardHome() {
           </div>
 
           {/* Metric strip with hover popovers */}
-          {synced && <MetricStrip synced={synced} />}
+          {synced && <MetricStrip synced={synced} user={user} />}
 
           {/* Training volume — Strava-style with sport + range filters */}
           <TrainingVolumeCard
@@ -189,22 +191,51 @@ export default function DashboardHome() {
           {/* Chart + Recent Sessions */}
           <div className="grid lg:grid-cols-3 gap-4 sm:gap-5 mb-10">
             <div className="lg:col-span-2 bg-surface border border-border-soft rounded-md p-4 sm:p-5">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
                 <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold">
-                  Performance Trend · last 90 days
+                  Performance Trend
+                  {user.plan && (
+                    <span className="text-text-muted/70 normal-case tracking-normal font-normal">
+                      {" "}· past 90d → race day
+                    </span>
+                  )}
+                  {!user.plan && (
+                    <span className="text-text-muted/70 normal-case tracking-normal font-normal">
+                      {" "}· last 90 days
+                    </span>
+                  )}
                 </div>
-                <div className="flex gap-3 text-[10.5px] text-text-muted font-medium">
+                <div className="flex gap-3 text-[10.5px] text-text-muted font-medium flex-wrap">
                   <span className="flex items-center gap-1.5">
                     <span className="w-3 h-0.5 bg-[#1F6B2A]" />CTL
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-3 h-0.5 bg-[#C0884A]" />ATL
                   </span>
+                  {user.plan && (
+                    <span
+                      className="flex items-center gap-1.5"
+                      title="Projection assumes you complete the planned sessions at 100% — Bannister EWMA forward from today's CTL/ATL."
+                    >
+                      <span
+                        className="w-3 h-0.5 opacity-55"
+                        style={{
+                          background:
+                            "linear-gradient(90deg, #1F6B2A 0 4px, transparent 4px 7px, #1F6B2A 7px 11px, transparent 11px 14px)",
+                        }}
+                      />
+                      Plan projection
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="h-52">
                 {synced ? (
-                  <PerfChart daily={synced.daily_90d} raceDate={race?.date} />
+                  <PerfChart
+                    daily={synced.daily_90d}
+                    raceDate={race?.date}
+                    plan={user.plan}
+                  />
                 ) : (
                   <div className="flex items-center justify-center h-full text-text-muted text-[12px]">
                     Sync data to see your trend
@@ -313,6 +344,8 @@ function ContextBar({
 }
 
 function ReadinessCard({ synced }: { synced?: SyncedData }) {
+  const [explainerOpen, setExplainerOpen] = useState(false);
+
   if (!synced) {
     return (
       <div className="bg-surface border border-dashed border-border rounded-md p-6 flex items-center justify-center text-[12.5px] text-text-muted">
@@ -326,6 +359,7 @@ function ReadinessCard({ synced }: { synced?: SyncedData }) {
   // Insight: count consecutive days at this readiness from daily TSB trend
   const tsb = synced.fitness?.tsb ?? 0;
   const ctl = synced.fitness?.ctl ?? 0;
+  const acwr = synced.derived?.acwr ?? null;
   let insight = "";
   if (rec === "go" && tsb > 5 && ctl < 30) {
     insight = "Fresh and undertrained — load is your friend this week.";
@@ -340,25 +374,249 @@ function ReadinessCard({ synced }: { synced?: SyncedData }) {
   }
 
   return (
-    <div className="bg-surface border border-border-soft rounded-md p-6">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-3">
-        Readiness
-      </div>
-      <div className={`text-5xl font-bold tracking-tight leading-none ${colour}`}>
-        {rec.toUpperCase()}
-      </div>
-      <div className="text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-semibold mt-2 mb-4">
-        — {rec === "go" ? "Clear to train" : rec === "modify" ? "Adjust today" : "Rest today"}
-      </div>
-      <p className="text-[12.5px] text-text-mid leading-relaxed mb-3">
-        {synced.readiness.reason}
-      </p>
-      <div className="pt-3 border-t border-border-soft">
-        <div className="text-[9.5px] uppercase tracking-wider text-accent font-bold mb-1">
-          Insight
+    <>
+      <div className="bg-surface border border-border-soft rounded-md p-6 relative">
+        {/* Info / explainer trigger — small, top-right, always visible */}
+        <button
+          type="button"
+          onClick={() => setExplainerOpen(true)}
+          aria-label="What does Readiness mean?"
+          className="absolute top-3 right-3 size-7 rounded-full text-text-muted hover:text-accent hover:bg-accent-soft transition flex items-center justify-center"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.5 9 A2.5 2.5 0 1 1 12 11.5 V13" />
+            <line x1="12" y1="16.5" x2="12" y2="16.6" />
+          </svg>
+        </button>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-3">
+          Readiness
         </div>
-        <p className="text-[11.5px] text-text-mid leading-relaxed">{insight}</p>
+        <div className={`text-5xl font-bold tracking-tight leading-none ${colour}`}>
+          {rec.toUpperCase()}
+        </div>
+        <div className="text-[10.5px] uppercase tracking-[0.1em] text-text-muted font-semibold mt-2 mb-4">
+          — {rec === "go" ? "Clear to train" : rec === "modify" ? "Adjust today" : "Rest today"}
+        </div>
+        <p className="text-[12.5px] text-text-mid leading-relaxed mb-3">
+          {synced.readiness.reason}
+        </p>
+        <div className="pt-3 border-t border-border-soft">
+          <div className="text-[9.5px] uppercase tracking-wider text-accent font-bold mb-1">
+            Insight
+          </div>
+          <p className="text-[11.5px] text-text-mid leading-relaxed">{insight}</p>
+        </div>
       </div>
+      <ReadinessExplainerModal
+        open={explainerOpen}
+        onClose={() => setExplainerOpen(false)}
+        verdict={rec}
+        tsb={tsb}
+        ctl={ctl}
+        acwr={acwr}
+      />
+    </>
+  );
+}
+
+function ReadinessExplainerModal({
+  open,
+  onClose,
+  verdict,
+  tsb,
+  ctl,
+  acwr,
+}: {
+  open: boolean;
+  onClose: () => void;
+  verdict: string;
+  tsb: number;
+  ctl: number;
+  acwr: number | null;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-bg border border-border rounded-t-2xl sm:rounded-lg max-w-lg w-full max-h-[92vh] sm:max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-4 sm:px-7 py-4 sm:py-5 border-b border-border-soft flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-accent font-bold mb-1">
+              How readiness is calculated
+            </div>
+            <h2 className="text-lg font-bold tracking-tight">
+              Your verdict: <span className={
+                verdict === "go" ? "text-go" :
+                verdict === "modify" ? "text-modify" : "text-rest"
+              }>{verdict.toUpperCase()}</span>
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-text-muted hover:text-text text-2xl leading-none flex-shrink-0"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-5">
+          <section>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-bold mb-2">
+              What it is
+            </div>
+            <p className="text-[13px] text-text-mid leading-relaxed">
+              Readiness is the system&apos;s one-word call on whether to train hard,
+              dial it back, or rest today. It blends two signals from your
+              training data: <strong className="text-text">TSB</strong> (form ─
+              how fresh you are) and <strong className="text-text">ACWR</strong>{" "}
+              (the ratio of recent load to chronic load ─ how fast you&apos;re
+              ramping).
+            </p>
+          </section>
+
+          <section>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-bold mb-2">
+              Today&apos;s inputs
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Metric label="TSB" value={tsb.toFixed(0)} hint={
+                tsb < -25 ? "Heavy fatigue"
+                : tsb > 10 ? "Very fresh"
+                : tsb >= 0 ? "Positive form"
+                : "Mild fatigue"
+              } />
+              <Metric label="ACWR" value={acwr != null ? acwr.toFixed(2) : "—"} hint={
+                acwr == null ? "n/a"
+                : acwr < 0.8 ? "Undertrained"
+                : acwr > 1.5 ? "Spike risk"
+                : acwr > 1.3 ? "Ramping fast"
+                : "Sustainable"
+              } />
+              <Metric label="CTL" value={ctl.toFixed(0)} hint={
+                ctl >= 60 ? "Well-trained"
+                : ctl >= 40 ? "Solid base"
+                : ctl >= 20 ? "Building"
+                : "Early base"
+              } />
+            </div>
+          </section>
+
+          <section>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-bold mb-2">
+              The verdicts
+            </div>
+            <div className="space-y-2">
+              <Verdict
+                level="GO"
+                active={verdict === "go"}
+                color="text-go"
+                rule="TSB ≥ −20 and ACWR between 0.5–1.5"
+                meaning="Clear to execute the planned session as written."
+              />
+              <Verdict
+                level="MODIFY"
+                active={verdict === "modify"}
+                color="text-modify"
+                rule="TSB < −25, OR ACWR > 1.5"
+                meaning="Keep movement, drop intensity. Swap quality work for Z2."
+              />
+              <Verdict
+                level="REST"
+                active={verdict === "rest"}
+                color="text-rest"
+                rule="Severe fatigue debt or scheduled recovery day"
+                meaning="Don&apos;t train. Sleep and food are the prescription today."
+              />
+            </div>
+          </section>
+
+          <section className="bg-accent-soft border border-accent-mid rounded-md p-4">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-accent font-bold mb-1">
+              Why it&apos;s not the whole story
+            </div>
+            <p className="text-[12.5px] text-text-mid leading-relaxed">
+              Readiness is a model, not your nervous system. If you slept badly,
+              feel sick, or life is dialled up to 11, trust that ─ skip or modify
+              regardless. The plan adapts; missing one quality session won&apos;t
+              derail anything.
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="bg-surface border border-border-soft rounded-md p-3 text-center">
+      <div className="text-[9px] uppercase tracking-[0.1em] text-text-muted font-bold">
+        {label}
+      </div>
+      <div className="text-xl font-bold tracking-tight mt-1">{value}</div>
+      <div className="text-[10px] text-text-muted mt-0.5">{hint}</div>
+    </div>
+  );
+}
+
+function Verdict({
+  level,
+  active,
+  color,
+  rule,
+  meaning,
+}: {
+  level: string;
+  active: boolean;
+  color: string;
+  rule: string;
+  meaning: string;
+}) {
+  return (
+    <div
+      className={`rounded-md border p-3 ${
+        active ? "border-accent bg-accent-soft" : "border-border-soft bg-surface"
+      }`}
+    >
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className={`text-[12px] font-bold ${color}`}>{level}</span>
+        {active && (
+          <span className="text-[9px] uppercase tracking-wider font-bold text-accent">
+            ← Today
+          </span>
+        )}
+      </div>
+      <div className="text-[11px] text-text-muted mb-1">{rule}</div>
+      <div className="text-[12px] text-text-mid">{meaning}</div>
     </div>
   );
 }
@@ -551,11 +809,18 @@ function Stat({
   );
 }
 
-function MetricStrip({ synced }: { synced: SyncedData }) {
+function MetricStrip({ synced, user }: { synced: SyncedData; user: UserState }) {
   const f = synced.fitness;
   const d = synced.derived;
   const a = synced.athlete;
   const daily: DailyRow[] = synced.daily_90d ?? [];
+  // Prefer the most recent locally-logged weight over the Intervals-sync value
+  // so the metric strip updates the moment the user logs a new measurement.
+  const effWeight = effectiveWeight(user);
+  const effWkg = effectiveWkg(user);
+  // True when the displayed weight differs from the synced source (i.e. it
+  // came from a fresh local log) — drives a small "logged" hint in the popover.
+  const weightFromLog = effWeight != null && effWeight !== (a.weight ?? null);
 
   // Derive 21-day series for each metric
   const last21 = daily.slice(-21);
@@ -607,14 +872,18 @@ function MetricStrip({ synced }: { synced: SyncedData }) {
       />
       <MetricChip
         label="W/kg"
-        value={synced.wkg != null ? synced.wkg.toFixed(2) : "—"}
-        tone={synced.wkg == null ? "muted" : synced.wkg >= 3.5 ? "ok" : synced.wkg >= 2.8 ? "default" : "warn"}
+        value={effWkg != null ? effWkg.toFixed(2) : "—"}
+        tone={effWkg == null ? "muted" : effWkg >= 3.5 ? "ok" : effWkg >= 2.8 ? "default" : "warn"}
         definition={METRIC_DEFINITIONS.wkg}
       />
       <MetricChip
         label="Weight"
-        value={a.weight != null ? `${a.weight}kg` : "—"}
-        definition={METRIC_DEFINITIONS.weight}
+        value={effWeight != null ? `${effWeight}kg` : "—"}
+        definition={
+          weightFromLog
+            ? `${METRIC_DEFINITIONS.weight} You've logged a more recent reading locally, which is what's shown here.`
+            : METRIC_DEFINITIONS.weight
+        }
       />
     </div>
   );

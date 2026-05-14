@@ -11,9 +11,13 @@ export const runtime = "edge";
 const SYSTEM = `You write a tight TRAINING brief for one specific week. 45-65 words, 3 sentences max.
 
 Required content:
-1. The week's purpose (consolidation, intensity intro, recovery, race-specific) and dominant stimulus.
+1. THIS week's distinct purpose within the phase — not a generic phase summary. If you have a weekly_note for this week, lead with what makes IT different from the week before/after (volume bump, key-session swap, deload, specificity layer).
 2. One concrete number that anchors it (target TSS, FTP %, duration of key session).
 3. How it serves the bigger goal (phase end-target or race day).
+
+Anti-patterns to avoid:
+- Don't write a paragraph that could equally describe any week of the phase. If the brief would still be true 3 weeks from now, rewrite it.
+- Don't just paraphrase the phase focus. The brief is for ONE week — be specific to it.
 
 Style: Plain text. No markdown. No headers. No bullets. Direct, second-person ("you"). British spelling. No preamble.`;
 
@@ -43,10 +47,27 @@ export async function POST(req: NextRequest) {
   const weekEnd = new Date(weekStartDate);
   weekEnd.setDate(weekEnd.getDate() + 6);
 
+  // Derive 1-based week index within the phase so the model can write a
+  // brief that's specific to this week (not a generic phase summary).
+  const phaseStart = new Date(phase.start_date);
+  const thisWeekStart = new Date(weekStartDate);
+  const weekIndexInPhase =
+    Math.floor(
+      (thisWeekStart.getTime() - phaseStart.getTime()) / (7 * 86400000)
+    ) + 1;
+  const phaseWeeksTotal =
+    (phase.weeks_to_end ?? 0) - (phase.weeks_from_start ?? 0) + 1;
+  const weeklyNote: string | null = Array.isArray(phase.weekly_notes)
+    ? (phase.weekly_notes[Math.max(0, weekIndexInPhase - 1)] ?? null)
+    : null;
+
   const userPrompt = `Write the training brief for this week.
 
 WEEK: ${weekStartDate} → ${weekEnd.toISOString().slice(0, 10)}
+POSITION IN PHASE: week ${weekIndexInPhase} of ${phaseWeeksTotal}
 PHASE: ${phase.name} (${phase.focus})  CTL target by phase end: ${phase.ctl_target_end ?? "n/a"}
+PHASE PROGRESSION LOGIC: ${phase.progression_logic || "(not specified — infer from template)"}
+THIS WEEK'S NOTE (load-bearing — lead with this): ${weeklyNote || "(not specified)"}
 RACE: ${raceGoal?.name} (${raceGoal?.type}) on ${raceGoal?.date} ${raceGoal?.targetTime ? `· target ${raceGoal.targetTime}` : ""}
 
 DAILY TEMPLATE:

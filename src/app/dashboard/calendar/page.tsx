@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  effectiveWeight,
   getUserState,
   normalizeDay,
   setUserState,
+  weekHasUnsavedEdits,
   type PlannedSession,
   type PlanPhase,
+  type Plan,
+  type PlanAmendment,
   type UserState,
   type SessionReconciliation,
 } from "@/lib/storage";
@@ -14,6 +18,8 @@ import { computeNutritionTargets } from "@/lib/nutrition";
 import { weekToText, weekToCsv, copyToClipboard, toLocalIso, type DayKey } from "@/lib/exports";
 import { downloadFile, safeFilename } from "@/lib/pwx";
 import { reconciliationsForDate } from "@/lib/reconcile";
+import { composeWeekEditAmendment } from "@/lib/weekEdits";
+import { generatePlanFromState } from "@/lib/planGen";
 import WorkoutDetailModal from "@/components/WorkoutDetailModal";
 import AmendmentChatModal from "@/components/AmendmentChatModal";
 import {
@@ -55,6 +61,10 @@ export default function CalendarPage() {
     weekContext: string;
     weekStartDate: string;
   } | null>(null);
+  /** Monday-ISO of the week currently being rebalanced via regenerate. */
+  const [rebalancing, setRebalancing] = useState<string | null>(null);
+  const [rebalanceError, setRebalanceError] = useState<string | null>(null);
+  const [rebalanceSuccess, setRebalanceSuccess] = useState<string | null>(null);
   const todayWeekRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,6 +93,132 @@ export default function CalendarPage() {
       todayWeekRef.current.scrollIntoView({ behavior: "auto", block: "start" });
     }
   }, [plan]);
+
+  // --- Week-edit handlers (delete / revert / save & rebalance) ---
+  // Defined inside the component so they have closure over plan + setUser.
+  // Each writes through setUserState so cloud sync picks up the change.
+
+  /** Remove a single session from a day. Writes a weekOverride for that day.
+   *  If it was the only non-rest session, the day becomes a Rest entry. */
+  function handleDeleteSession(mondayIso: string, dayKey: DayKey, idx: number) {
+    if (!plan) return;
+    const monday = new Date(mondayIso + "T00:00:00");
+    const dayDate = new Date(monday);
+    dayDate.setDate(monday.getDate() + DAY_KEYS.indexOf(dayKey));
+    const dayPhase = phaseForDate(plan.phases, dayDate);
+    if (!dayPhase) return;
+
+    const existingOverride = plan.weekOverrides?.[mondayIso]?.[dayKey];
+    const currentDay =
+      existingOverride !== undefined
+        ? normalizeDay(existingOverride)
+        : normalizeDay(dayPhase.weekly_template[dayKey]);
+
+    const newDay = currentDay.filter((_, i) => i !== idx);
+    const finalDay: PlannedSession[] =
+      newDay.length === 0
+        ? [
+            {
+              slot: "REST",
+              type: "rest",
+              title: "Rest",
+              duration: "—",
+              summary: "Rest (deleted)",
+              sport: "rest",
+            },
+          ]
+        : newDay;
+
+    const newWeekOverride = {
+      ...(plan.weekOverrides?.[mondayIso] ?? {}),
+      [dayKey]: finalDay,
+    };
+    const newOverrides = {
+      ...(plan.weekOverrides ?? {}),
+      [mondayIso]: newWeekOverride,
+    };
+    const updatedPlan: Plan = { ...plan, weekOverrides: newOverrides };
+    setUserState({ plan: updatedPlan });
+    setUser(getUserState());
+    window.dispatchEvent(new Event("phantomcoach:plan-generated"));
+  }
+
+  /** Drop all overrides for this week — snap back to the phase template. */
+  function handleRevertWeek(mondayIso: string) {
+    if (!plan) return;
+    if (
+      !confirm(
+        "Revert this week to the original plan? Any moves or deletions for this week will be undone."
+      )
+    )
+      return;
+    const newOverrides = { ...(plan.weekOverrides ?? {}) };
+    delete newOverrides[mondayIso];
+    const updatedPlan: Plan = { ...plan, weekOverrides: newOverrides };
+    setUserState({ plan: updatedPlan });
+    setUser(getUserState());
+    window.dispatchEvent(new Event("phantomcoach:plan-generated"));
+  }
+
+  /** Compose a structural amendment from the week's edits and regenerate.
+   *  After regen the new plan integrates the change AND adds compensation
+   *  load in the next 1-2 weeks via the amendment prompt directive. */
+  async function handleSaveAndRebalance(mondayIso: string) {
+    if (!plan) return;
+    const summary = composeWeekEditAmendment(plan, mondayIso);
+    if (!summary) {
+      // Nothing actually changed vs the template — just clear the override.
+      handleRevertWeek(mondayIso);
+      return;
+    }
+
+    const confirmMsg =
+      summary.netLostTss > 5
+        ? `Save changes and rebalance future weeks?\n\n${summary.uiSummary}\nThe coach will recover the missed load by extending easy aerobic time in the next 1-2 weeks (no new quality sessions added).\n\nRegenerating the plan takes ~30 seconds.`
+        : summary.netLostTss < -5
+          ? `Save changes and rebalance future weeks?\n\n${summary.uiSummary}\nThe coach will trim aerobic volume slightly next week to keep the ramp rate sustainable.\n\nRegenerating takes ~30 seconds.`
+          : `Save changes?\n\n${summary.uiSummary}\nThe rest of the plan stays untouched (no load impact).`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setRebalancing(mondayIso);
+    setRebalanceError(null);
+
+    // Append a structural amendment that the next regenerate will honour.
+    const newAmendment: PlanAmendment = {
+      id: `weekedit-${mondayIso}-${Date.now()}`,
+      appliedAt: new Date().toISOString(),
+      weekContext: `Week of ${mondayIso}`,
+      description: summary.amendmentDescription,
+    };
+    const existingAmendments = getUserState().amendments ?? [];
+    setUserState({ amendments: [...existingAmendments, newAmendment] });
+
+    const result = await generatePlanFromState();
+    if (!result.ok) {
+      setRebalanceError(result.error);
+      setRebalancing(null);
+      return;
+    }
+
+    // Preserve any OTHER weeks' overrides on the new plan — only the saved
+    // week's override gets cleared (the new plan has integrated that change).
+    const preservedOverrides = { ...(plan.weekOverrides ?? {}) };
+    delete preservedOverrides[mondayIso];
+    const newPlan: Plan = {
+      ...result.plan,
+      weekOverrides: preservedOverrides,
+    };
+
+    setUserState({ plan: newPlan, weeklyBriefs: {} });
+    setUser(getUserState());
+    setRebalancing(null);
+    setRebalanceSuccess(
+      `Week of ${mondayIso} saved. Plan rebalanced to absorb the change.`
+    );
+    setTimeout(() => setRebalanceSuccess(null), 5500);
+    window.dispatchEvent(new Event("phantomcoach:plan-generated"));
+  }
 
   if (!plan) {
     return <NoPlanCallout />;
@@ -148,6 +284,10 @@ export default function CalendarPage() {
                 onAmend={(weekContext, weekStartDate) =>
                   setAmendOpen({ weekContext, weekStartDate })
                 }
+                onDeleteSession={handleDeleteSession}
+                onRevertWeek={handleRevertWeek}
+                onSaveAndRebalance={handleSaveAndRebalance}
+                rebalancingMondayIso={rebalancing}
               />
             ))}
 
@@ -182,6 +322,7 @@ export default function CalendarPage() {
         phase={openSession?.phase ?? null}
         synced={user.synced}
         athleteNotes={user.athleteNotes}
+        effectiveWeightKg={effectiveWeight(user)}
       />
 
       <AmendmentChatModal
@@ -194,6 +335,48 @@ export default function CalendarPage() {
         raceGoal={user.raceGoal}
         athleteNotes={user.athleteNotes}
       />
+
+      {/* Rebalance toast — fixed bottom, auto-dismisses on success */}
+      {(rebalancing || rebalanceSuccess || rebalanceError) && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-[calc(100%-2rem)]">
+          {rebalancing && (
+            <div className="bg-accent-soft border border-accent-mid rounded-md px-4 py-3 shadow-xl flex items-center gap-3">
+              <span className="inline-flex gap-0.5">
+                <span className="size-1.5 rounded-full bg-accent animate-pulse" />
+                <span className="size-1.5 rounded-full bg-accent animate-pulse [animation-delay:120ms]" />
+                <span className="size-1.5 rounded-full bg-accent animate-pulse [animation-delay:240ms]" />
+              </span>
+              <div className="text-[12.5px] text-accent font-semibold">
+                Rebalancing future weeks to absorb your changes…
+              </div>
+            </div>
+          )}
+          {rebalanceSuccess && !rebalancing && (
+            <div className="bg-go-soft border border-go/30 rounded-md px-4 py-3 shadow-xl flex items-center gap-3">
+              <span className="size-5 rounded-full bg-go flex items-center justify-center flex-shrink-0">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="text-bg" aria-hidden>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </span>
+              <div className="text-[12.5px] text-go font-semibold">{rebalanceSuccess}</div>
+            </div>
+          )}
+          {rebalanceError && !rebalancing && (
+            <div className="bg-modify-soft border border-modify/40 rounded-md px-4 py-3 shadow-xl flex items-start gap-3">
+              <div className="text-[12.5px] text-modify font-semibold flex-1">
+                ⚠️ Rebalance failed: {rebalanceError}
+              </div>
+              <button
+                onClick={() => setRebalanceError(null)}
+                className="text-modify/70 hover:text-modify text-lg leading-none flex-shrink-0"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -208,6 +391,10 @@ function WeekRow({
   user,
   onClickSession,
   onAmend,
+  onDeleteSession,
+  onRevertWeek,
+  onSaveAndRebalance,
+  rebalancingMondayIso,
   ref,
 }: {
   monday: Date;
@@ -224,6 +411,11 @@ function WeekRow({
     phase: PlanPhase | null
   ) => void;
   onAmend: (weekContext: string, weekStartDate: string) => void;
+  onDeleteSession: (mondayIso: string, day: DayKey, idx: number) => void;
+  onRevertWeek: (mondayIso: string) => void;
+  onSaveAndRebalance: (mondayIso: string) => void;
+  /** Monday-ISO of the week currently being regenerated, or null. */
+  rebalancingMondayIso: string | null;
   ref?: React.Ref<HTMLDivElement>;
 }) {
   const phaseWeekNum = phase
@@ -341,6 +533,16 @@ function WeekRow({
     downloadFile(filename, csv, "text/csv");
   }
 
+  const hasUnsavedEdits = weekHasUnsavedEdits(user.plan, weekStartIso);
+  const isRebalancing = rebalancingMondayIso === weekStartIso;
+  const editSummary = useMemo(
+    () =>
+      hasUnsavedEdits && user.plan
+        ? composeWeekEditAmendment(user.plan, weekStartIso)
+        : null,
+    [hasUnsavedEdits, user.plan, weekStartIso]
+  );
+
   return (
     <div ref={ref} className="scroll-mt-4">
       {/* Week label strip */}
@@ -401,6 +603,43 @@ function WeekRow({
           </button>
         </div>
       </div>
+
+      {/* Unsaved-edits banner — appears when the user has moved or deleted
+          sessions in this week but hasn't asked the coach to rebalance the
+          rest of the plan around them. Save commits the change and
+          regenerates with a structural amendment; Revert drops the override. */}
+      {hasUnsavedEdits && !isPast && (
+        <div className="mb-3 rounded-md border border-accent-mid bg-accent-soft px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-bold text-accent mb-0.5">
+              Unsaved changes
+            </div>
+            <div className="text-[12.5px] text-text leading-snug">
+              {editSummary?.uiSummary || "You've modified this week."}{" "}
+              <span className="text-text-mid">
+                Save to lock these in and rebalance future weeks, or revert to
+                the original plan.
+              </span>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              onClick={() => onRevertWeek(weekStartIso)}
+              disabled={isRebalancing}
+              className="flex-1 sm:flex-none px-3 py-2 sm:py-1.5 text-[11.5px] font-semibold rounded-md border border-border hover:border-modify hover:text-modify text-text-mid bg-bg transition disabled:opacity-50 whitespace-nowrap"
+            >
+              Revert
+            </button>
+            <button
+              onClick={() => onSaveAndRebalance(weekStartIso)}
+              disabled={isRebalancing}
+              className="flex-1 sm:flex-none px-3 py-2 sm:py-1.5 text-[11.5px] font-semibold rounded-md bg-accent hover:bg-accent-h text-white transition disabled:opacity-50 whitespace-nowrap"
+            >
+              {isRebalancing ? "Rebalancing…" : "Save & rebalance"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile: summary appears at the top of each week so the week's brief is
           visible before scrolling through 7 day rows. Desktop: lives in the
@@ -535,7 +774,21 @@ function WeekRow({
                       key={idx}
                       session={s}
                       muted={hasLogged}
-                      draggable={s.type !== "rest" && !hasLogged}
+                      draggable={s.type !== "rest" && !hasLogged && !isPast}
+                      deletable={s.type !== "rest" && !hasLogged && !isPast}
+                      onDelete={() => {
+                        if (
+                          confirm(
+                            `Delete "${s.title}"?\n\nThis adds an unsaved change to the week — click Save & rebalance to commit and recover the load in upcoming weeks.`
+                          )
+                        ) {
+                          onDeleteSession(
+                            weekStartIso,
+                            key as DayKey,
+                            idx
+                          );
+                        }
+                      }}
                       onDragStart={(e) => {
                         e.dataTransfer.setData(
                           "application/json",
@@ -680,8 +933,10 @@ function WeekSummary({
   const canAmend = !isPast;
   void monday;
 
-  // Compute weekly nutrition guide from athlete weight + planned sessions
-  const weight = user.synced?.athlete?.weight ?? null;
+  // Compute weekly nutrition guide from athlete weight + planned sessions.
+  // Uses the locally-logged weight when fresher than the synced value so a
+  // just-logged measurement updates fuelling guidance immediately.
+  const weight = effectiveWeight(user);
   const nutrition = useMemo(() => {
     if (!dailyTemplate || !weight) return null;
     const days = DAY_KEYS.map((k) =>
@@ -706,6 +961,16 @@ function WeekSummary({
     };
   }, [dailyTemplate, weight, user.athleteNotes]);
 
+  // Derive this week's index inside the phase and pluck out the per-week note
+  // the generator emitted. Surfacing this makes it obvious that "wk 3 of 5" is
+  // structurally different from "wk 1 of 5" even when the day templates repeat.
+  const phaseStart = new Date(phase.start_date);
+  const weekIndexInPhase =
+    Math.floor((monday.getTime() - phaseStart.getTime()) / (7 * 86400000)) + 1;
+  const weeklyNote: string | null = Array.isArray(phase.weekly_notes)
+    ? (phase.weekly_notes[Math.max(0, weekIndexInPhase - 1)] ?? null)
+    : null;
+
   return (
     <div
       className={`rounded-md p-4 self-start flex flex-col gap-3 ${
@@ -724,6 +989,15 @@ function WeekSummary({
           </div>
         )}
       </div>
+
+      {weeklyNote && (
+        <div className="border-l-2 border-accent pl-2.5 -ml-0.5">
+          <div className="text-[9px] uppercase tracking-[0.12em] font-bold text-accent">
+            This week
+          </div>
+          <p className="text-[12px] text-text leading-snug mt-0.5">{weeklyNote}</p>
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center gap-2 text-[11.5px] text-text-muted">
@@ -793,6 +1067,8 @@ function SessionCard({
   onClick,
   muted = false,
   draggable = false,
+  deletable = false,
+  onDelete,
   onDragStart,
   onDragEnd,
 }: {
@@ -800,6 +1076,9 @@ function SessionCard({
   onClick: () => void;
   muted?: boolean;
   draggable?: boolean;
+  /** When true, render a small × in the top-right that calls onDelete. */
+  deletable?: boolean;
+  onDelete?: () => void;
   onDragStart?: (e: React.DragEvent<HTMLButtonElement>) => void;
   onDragEnd?: (e: React.DragEvent<HTMLButtonElement>) => void;
 }) {
@@ -808,13 +1087,40 @@ function SessionCard({
   // Key sessions get a thicker border to flag the week's anchor workout
   const isKey = session.type === "key" || session.type === "test";
   return (
+    <div className="relative group/sessioncard">
+      {deletable && onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          aria-label={`Delete ${session.title}`}
+          className="absolute top-1 right-1 z-10 size-6 rounded-full bg-bg/85 border border-border-soft text-text-muted hover:text-modify hover:border-modify hover:bg-modify-soft flex items-center justify-center transition opacity-0 group-hover/sessioncard:opacity-100 focus:opacity-100 sm:focus-within:opacity-100 max-md:opacity-100"
+        >
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="6" y1="18" x2="18" y2="6" />
+          </svg>
+        </button>
+      )}
     <button
       onClick={onClick}
       disabled={!isClickable}
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`text-left rounded-md ${isKey ? "border-2" : "border"} px-2.5 py-2 transition min-h-[88px] flex flex-col ${palette.bg} ${palette.border} ${
+      className={`w-full text-left rounded-md ${isKey ? "border-2" : "border"} px-2.5 py-2 transition min-h-[88px] flex flex-col ${palette.bg} ${palette.border} ${
         muted ? "opacity-40" : ""
       } ${
         isClickable && !muted
@@ -865,6 +1171,7 @@ function SessionCard({
         </div>
       )}
     </button>
+    </div>
   );
 }
 

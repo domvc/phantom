@@ -16,28 +16,33 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const cloud = useCloudSync();
-  const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Auth + onboarding guard. `cloud.ready` flips true as soon as the cached
+  // Supabase session loads (effectively instant), so we don't double-gate
+  // render with a separate `ready` flag — that previously caused a Loading
+  // flash on every soft navigation on mobile.
   useEffect(() => {
     if (!cloud.ready) return;
-
-    // Auth guard: if Supabase is configured but the user isn't signed in,
-    // bounce to /sign-in. (Demo mode without Supabase: skip the guard.)
     if (cloud.configured && !cloud.user) {
       router.replace("/sign-in");
       return;
     }
-
     const s = getUserState();
     if (!s.onboardingComplete) {
       router.replace("/onboarding");
-      return;
     }
-    setReady(true);
   }, [router, cloud.ready, cloud.configured, cloud.user]);
+
+  // We're allowed to render once the session check resolved AND we haven't
+  // been redirected. The brief moment between `cloud.ready` flipping and the
+  // router.replace firing is harmless — at worst one frame of the dashboard
+  // before the redirect kicks in. That's preferable to the Loading flash.
+  const shouldRender =
+    cloud.ready &&
+    !(cloud.configured && !cloud.user); // signed-out users will get redirected
 
   // Close mobile drawer on route change so it doesn't persist after navigation.
   useEffect(() => {
@@ -102,7 +107,7 @@ export default function DashboardLayout({
     }
   }
 
-  if (!ready) {
+  if (!shouldRender) {
     return (
       <main className="flex flex-1 items-center justify-center text-[13px] text-text-muted">
         Loading…

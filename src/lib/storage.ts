@@ -173,6 +173,21 @@ export type PlanPhase = {
   focus: string;
   ctl_target_end?: number | null;
   weekly_template: WeeklyTemplate;
+  /**
+   * One-paragraph description of how the phase progresses week-by-week —
+   * what changes in volume, intensity, specificity from week 1 to the end.
+   * Surfaced in the calendar so users see the structural intent across
+   * weeks even when the day-of-week template repeats.
+   */
+  progression_logic?: string;
+  /**
+   * Per-week notes, length = (weeks_to_end - weeks_from_start + 1). Index 0
+   * is the first week of the phase. Each entry is ≤15 words describing that
+   * specific week's emphasis (volume bump, key-session swap, deload, etc.).
+   * Rendered in the calendar week summary panel so two weeks of the same
+   * phase don't look identical even though they share a template.
+   */
+  weekly_notes?: string[];
 };
 
 export type PlanMilestone = {
@@ -289,7 +304,7 @@ export type UserState = {
   briefVersion?: number;
 };
 
-const CURRENT_BRIEF_VERSION = 6;
+const CURRENT_BRIEF_VERSION = 7;
 
 const KEY = "phantomcoach:user";
 
@@ -366,6 +381,50 @@ export function nextPrimaryRace(races: RaceGoal[]): RaceGoal | undefined {
 export function sortedRaces(races?: RaceGoal[]): RaceGoal[] {
   if (!races) return [];
   return [...races].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Returns true if the plan has any pending edits for the given week — i.e.
+ * the user dragged/deleted something for that Monday and hasn't yet asked the
+ * coach to rebalance the rest of the plan around it.
+ */
+export function weekHasUnsavedEdits(
+  plan: Plan | undefined,
+  mondayIso: string
+): boolean {
+  const override = plan?.weekOverrides?.[mondayIso];
+  if (!override) return false;
+  // Any non-empty override day counts as a pending edit.
+  return Object.keys(override).length > 0;
+}
+
+/**
+ * Effective athlete weight — prefers the most recent locally-logged
+ * BodyMeasurement over the synced (Intervals.icu) weight, because the user
+ * logs in the app more often than Intervals.icu pulls a fresh value, and
+ * because the user expects "I just typed 72.4kg" to update everything.
+ *
+ * Returns null when nothing is known.
+ */
+export function effectiveWeight(state: UserState): number | null {
+  const measurements = state.bodyMeasurements ?? [];
+  const latest = [...measurements]
+    .filter((m) => m.weightKg != null)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (latest?.weightKg != null) return latest.weightKg;
+  return state.synced?.athlete?.weight ?? null;
+}
+
+/**
+ * Effective W/kg — FTP divided by `effectiveWeight`. Recomputed locally
+ * so it stays in sync with a freshly-logged weight without waiting for an
+ * Intervals.icu sync to round-trip.
+ */
+export function effectiveWkg(state: UserState): number | null {
+  const w = effectiveWeight(state);
+  const ftp = state.synced?.athlete?.ftp ?? null;
+  if (!w || !ftp) return null;
+  return Number((ftp / w).toFixed(2));
 }
 
 export function setUserState(patch: Partial<UserState>) {

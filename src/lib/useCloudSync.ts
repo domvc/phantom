@@ -45,18 +45,26 @@ export function useCloudSync(): CloudSyncStatus {
     const onChange = () => scheduleCloudFlush();
     window.addEventListener("phantomcoach:state-changed", onChange);
 
-    // Initial: get session, hydrate if signed in
-    (async () => {
-      const {
-        data: { user: u },
-      } = await sb.auth.getUser();
+    // Read the cached session from localStorage — this is effectively
+    // synchronous (no network roundtrip) so we can flip `ready` almost
+    // immediately. The cloud hydrate fires in the background and dispatches
+    // a state-changed event when it lands, so components re-render then.
+    //
+    // Previously we awaited `sb.auth.getUser()` (server-validated) AND the
+    // cloud hydrate before un-gating render. That meant every layout mount
+    // showed a "Loading…" flash on mobile networks while two network calls
+    // ran in series. Now the user sees their cached state instantly and any
+    // cloud-fresher state replaces it without blocking the UI.
+    sb.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return;
-      setUser(u);
-      if (u) {
-        await hydrateFromCloud();
+      setUser(session?.user ?? null);
+      setReady(true);
+      if (session?.user) {
+        hydrateFromCloud().catch(() => {
+          /* hydration is best-effort — local state stays authoritative */
+        });
       }
-      if (!cancelled) setReady(true);
-    })();
+    });
 
     // Subscribe to auth changes (sign-in / sign-out from another tab)
     const { data: sub } = sb.auth.onAuthStateChange(async (_event, session) => {

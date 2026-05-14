@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { UserState } from "@/lib/storage";
+import { effectiveWeight, type UserState } from "@/lib/storage";
 import { computeReminders } from "@/lib/nutrition";
 import BodyProgressModal from "@/components/BodyProgressModal";
 
@@ -69,7 +69,7 @@ export default function NutritionCard({ user }: { user: UserState }) {
         onClose={() => setOpen(false)}
         measurements={measurements}
         athleteNotes={user.athleteNotes}
-        currentWeight={user.synced?.athlete?.weight ?? null}
+        currentWeight={effectiveWeight(user)}
       />
     </>
   );

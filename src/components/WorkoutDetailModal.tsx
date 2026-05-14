@@ -67,6 +67,9 @@ type Props = {
   phase: PlanPhase | null;
   synced?: SyncedData;
   athleteNotes?: AthleteNotes;
+  /** Weight to use for PWX export / power calcs — prefers a locally-logged
+   *  measurement over synced.athlete.weight when fresher. Caller resolves. */
+  effectiveWeightKg?: number | null;
 };
 
 export default function WorkoutDetailModal({
@@ -78,6 +81,7 @@ export default function WorkoutDetailModal({
   phase,
   synced,
   athleteNotes,
+  effectiveWeightKg,
 }: Props) {
   const [detail, setDetail] = useState<Partial<WorkoutDetail>>({});
   const [streaming, setStreaming] = useState(false);
@@ -220,7 +224,7 @@ export default function WorkoutDetailModal({
           ? {
               ftp: synced.athlete.ftp,
               lthr: synced.athlete.lthr,
-              weight: synced.athlete.weight,
+              weight: effectiveWeightKg ?? synced.athlete.weight,
             }
           : {},
       });

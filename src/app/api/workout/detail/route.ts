@@ -49,7 +49,16 @@ Style:
 - For strength sessions: rationale must focus on strength (hypertrophy, durability, body comp), NOT on cardiovascular metrics primarily.
 - For run sessions: rationale focuses on aerobic base, lactate threshold, durability, etc.
 - For bike sessions: rationale focuses on power, FTP development, etc.
-- Always emit ALL sections in order. Never skip.`;
+- Always emit ALL sections in order. Never skip.
+
+WEEK-IN-PHASE PROGRESSION (load-bearing):
+- The plan emits ONE weekly_template per phase, but you must NOT prescribe identical workouts across every week of a phase. Week 1 of 5 in Base is an introduction; week 5 of 5 is a meaningful step up; week 4 might be a deload.
+- If you're told "week N of M" and given a "weekly emphasis" note, the warmup/main/cooldown structure, set counts, and durations must reflect WHERE in the phase this week sits:
+  • Early weeks: shorter main sets, slightly easier targets, longer warmups to bed in technique.
+  • Middle weeks: full prescription, hardest sets within the phase's intent.
+  • Final week before next phase: either consolidation OR mild deload — read the weekly emphasis note.
+- Volume progression rule of thumb: each non-deload week within a phase adds 5-10% to the main-set time or rep count vs the previous week. Quote the volume difference in the rationale ("This is week 3 of 5 — main set is 30% longer than week 1 to build the aerobic time-at-threshold base").
+- If the weekly emphasis note says "deload" or "consolidation", CUT main-set volume by 25-35% and keep intensity at the lower end of the prescription. Call this out explicitly in the rationale.`;
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -67,9 +76,31 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "No session provided" }), { status: 400 });
   }
 
+  // Compute week-in-phase from the session date + phase.start_date so the
+  // detailed prescription can progressively load (wk 3 of 5 should be harder
+  // than wk 1 of 5 even when the weekly_template is identical).
+  let weekInPhase: number | null = null;
+  let phaseWeeksTotal: number | null = null;
+  let weeklyNote: string | null = null;
+  if (phase && phase.start_date && date) {
+    const phaseStart = new Date(phase.start_date);
+    const sessionDate = new Date(date);
+    weekInPhase = Math.floor(
+      (sessionDate.getTime() - phaseStart.getTime()) / (7 * 86400000)
+    ) + 1;
+    phaseWeeksTotal =
+      (phase.weeks_to_end ?? 0) - (phase.weeks_from_start ?? 0) + 1;
+    if (Array.isArray(phase.weekly_notes)) {
+      weeklyNote = phase.weekly_notes[Math.max(0, weekInPhase - 1)] ?? null;
+    }
+  }
+
   const userPrompt = `Generate the workout in detail for THIS specific session (note the sport — your rationale must match it).
 
 DAY: ${day || ""} ${date ? `(${date})` : ""}
+POSITION IN PHASE: ${weekInPhase != null && phaseWeeksTotal != null ? `week ${weekInPhase} of ${phaseWeeksTotal}` : "(unknown)"}
+THIS WEEK'S EMPHASIS (load-bearing — adjust volume/intensity to match): ${weeklyNote || "(not specified — infer from phase progression)"}
+
 SESSION (output rationale must reference THIS session, not any other):
 ${JSON.stringify(session, null, 2)}
 

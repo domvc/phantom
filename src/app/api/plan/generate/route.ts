@@ -24,7 +24,9 @@ Schema:
         "monday": [<session>], "tuesday": [<session>], "wednesday": [<session>],
         "thursday": [<session>], "friday": [<session>],
         "saturday": [<session>], "sunday": [<session>]
-      }
+      },
+      "progression_logic": "<one sentence, ≤30 words, describing how this phase progresses week-by-week — what shifts in volume / intensity / specificity from week 1 to the final week>",
+      "weekly_notes": ["<wk1 note ≤15 words>", "<wk2 note>", ..., "<wkN note>"]
     }
   ],
   "milestones": [
@@ -56,6 +58,13 @@ Hard rules:
 8. Athlete notes are load-bearing — holidays, secondary goals, constraints all shape templates.
 9. 4-6 milestones: phase ends, key tests, race simulation 4 weeks out, race day. Race day mandatory and last.
 10. CTL ramp ≤ 5/week.
+
+Within-phase progression — NON-NEGOTIABLE (the calendar will surface this):
+11. NEVER emit a phase whose weeks all look identical. The weekly_template is a shape; weekly_notes carries the week-by-week change. A 5-week phase with weekly_notes = ["wk1: introduce", "wk1: introduce", ...] is rejected.
+12. The session "duration" field is the primary lever for in-phase volume progression. Use ranges that ramp across weeks ("60-75min" wk1, "75-90min" wk3, "90-105min" wk4 deload). Pick durations that imply ≤10% week-over-week increase, NOT a flat number across 5 weeks.
+13. Within a phase of N weeks, include at least ONE distinct intra-phase progression: a key session intensity bump in the middle weeks, a deload (cut volume ~25%) every 3-4 weeks, or a specificity layer added in the final weeks.
+14. weekly_notes[i] is mandatory for every week of every phase. Be specific: "wk3: +1 Z3 tempo block on Tue, long ride extends to 2h" not "wk3: continued aerobic build". Generic notes are rejected.
+15. progression_logic is mandatory per phase. Explain the structural arc: what gets added, what gets dropped, when the deload falls.
 
 Output ONLY the JSON object.`;
 
