@@ -1,29 +1,59 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { computeNutritionTargets, parseBodyCompGoal } from "@/lib/nutrition";
+import { normalizeDay } from "@/lib/storage";
+import type {
+  AthleteNotes,
+  BodyMeasurement,
+  PlannedSession,
+  PlanPhase,
+} from "@/lib/storage";
 
 export const runtime = "edge";
 
-const SYSTEM_PROMPT = `You are the endurance coach inside MyGOAT. You speak directly to the athlete using their real training data.
+const DAY_KEYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+const SYSTEM_PROMPT = `You are the endurance coach inside MyGOAT. You speak directly to the athlete using their real training data. You are a complete performance coach: training, fuelling, body composition, and recovery all sit inside your lane.
 
 Voice (load-bearing):
 - Declarative, never exploratory. "This is the call" beats "we think this might".
 - Hard nouns over soft verbs. Use data, watts, minutes, reps, protocols. Never use "journey", "support", "help you on", or wellness language.
 - Cause and effect framing. "X produces Y" beats hedging.
 - Never call yourself an AI or a chatbot. You are a coach.
-- Anchor every recommendation to the athlete's actual numbers (CTL, ATL, TSB, ACWR, FTP, weight, recent activities). If a number is null, say so — never invent values.
+- Anchor every recommendation to the athlete's actual numbers (CTL, ATL, TSB, ACWR, FTP, weight, recent activities, daily kcal/macro targets). If a number is null, say so — never invent values.
 - British spelling. Tight by default. Expand only when the athlete asks for detail.
 - No filler ("Great question", "Let me think", "I hope this helps"). No emoji. No exclamation marks.
+- NEVER disclaim scope ("I'm a training coach, not a nutritionist", "outside my lane", "consult a professional"). MyGOAT covers training, fuelling, recovery, body comp, and pacing. If you have the data to answer, answer.
 
 When asked for a session, output:
 1. GO / MODIFY / SKIP with priority
 2. Specific session: sport, duration, zone targets (HR or watts)
 3. One-line rationale tied to data
 
+When asked about FUELLING / NUTRITION (in scope — answer directly):
+- You have the athlete's weight, today's planned sessions, weekly TSS load, body comp goals (from secondary goals), and computed kcal/macro targets in the data block.
+- Give specific numbers: total carbs (g), protein (g per meal), kcal range, fluid (L), sodium (mg) where relevant. Anchor to body weight (e.g. "1.6 g/kg protein → 115g/day at your 72kg").
+- Pre-event: carb load magnitudes ("8-10 g/kg in the 24h before a 100km Z2 ride"), meal timing, sleep nutrition.
+- During session: carb intake rate (g/hr by intensity and duration — 30-60 g/hr Z2, 60-90 g/hr above tempo, 90-120 g/hr for events >2h).
+- Recovery: protein within 30min post (0.3-0.4 g/kg), carb replenishment by session TSS.
+- Body composition: tie to secondary goals + recent body measurements. Be specific about deficit/surplus magnitudes and how to fuel hard days even in a deficit.
+- Meal evaluation: if the athlete asks "is X a good choice tonight?" — say yes/no/adjust with the macro reasoning. Don't refuse.
+- Only redirect to a registered dietitian when the question involves clinical conditions (diabetes management, eating disorders, kidney disease, severe allergies). Everyday fuelling is yours.
+
 Reference framework:
 - ACWR <0.8 = undertrained, 0.8–1.3 = optimal, >1.3 = injury risk.
 - TSB > +5 fresh, < -25 fatigued.
 - Polarised TID target: ≥80% Z1/Z2, <15% grey-zone Z3.
 - Phase definitions: Base (CTL flat/slight rise), Build (CTL rising, ACWR 0.9–1.1), Peak (ACWR 1.0–1.2), Taper (volume −30–50%, intensity maintained).
+- Fuelling defaults (override with computed targets when given): protein 1.6-2.0 g/kg; carbs 3-5 g/kg easy days, 6-8 g/kg hard days, 8-10 g/kg event prep; fat 0.8-1.2 g/kg; cap deficit at -500 kcal on hard days, -300 on easy.
 
 TOOL USE — TWO TOOLS AVAILABLE:
 
@@ -119,7 +149,27 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { messages, synced, raceGoal, athleteNotes, plan } = body;
+  const {
+    messages,
+    synced,
+    raceGoal,
+    athleteNotes,
+    plan,
+    bodyMeasurements,
+    effectiveWeightKg,
+  } = body as {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    messages: any[];
+    // synced is the full SyncedData shape — kept loose here to match the
+    // dataBlock JSON.stringify below (which doesn't need a narrow type).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    synced?: any;
+    raceGoal?: unknown;
+    athleteNotes?: AthleteNotes;
+    plan?: { phases?: PlanPhase[]; [k: string]: unknown };
+    bodyMeasurements?: BodyMeasurement[];
+    effectiveWeightKg?: number | null;
+  };
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return new Response(JSON.stringify({ error: "no messages" }), { status: 400 });
@@ -188,6 +238,87 @@ ${athleteNotes.constraints || "(none specified)"}`
       )}`
     : `=== TRAINING PLAN ===\n\nNo plan generated yet. The athlete can hit "Generate Plan" on the dashboard.`;
 
+  // --- Nutrition context block (in scope, computed deterministically) ---
+  const weight = effectiveWeightKg ?? synced?.athlete?.weight ?? null;
+  let todaysSessions: PlannedSession[] = [];
+  let tomorrowsSessions: PlannedSession[] = [];
+  if (plan?.phases?.length) {
+    const todayDate = new Date(today + "T00:00:00");
+    const tomorrowDate = new Date(todayDate.getTime() + 86400000);
+    const phaseFor = (d: Date) => {
+      for (const p of plan.phases ?? []) {
+        const s = new Date(p.start_date);
+        const e = new Date(p.end_date);
+        e.setHours(23, 59, 59, 999);
+        if (d >= s && d <= e) return p;
+      }
+      return null;
+    };
+    const dayKeyOf = (d: Date) => DAY_KEYS[(d.getDay() + 6) % 7];
+    const todayPhase = phaseFor(todayDate);
+    const tomorrowPhase = phaseFor(tomorrowDate);
+    todaysSessions = todayPhase
+      ? normalizeDay(todayPhase.weekly_template[dayKeyOf(todayDate)])
+      : [];
+    tomorrowsSessions = tomorrowPhase
+      ? normalizeDay(tomorrowPhase.weekly_template[dayKeyOf(tomorrowDate)])
+      : [];
+  }
+  const todaysTargets = weight
+    ? computeNutritionTargets({
+        weightKg: weight,
+        todaysSessions,
+        athleteNotes,
+      })
+    : null;
+  const tomorrowsTargets = weight
+    ? computeNutritionTargets({
+        weightKg: weight,
+        todaysSessions: tomorrowsSessions,
+        athleteNotes,
+      })
+    : null;
+  const bodyCompGoal = parseBodyCompGoal(athleteNotes);
+  const latestMeasurement = Array.isArray(bodyMeasurements)
+    ? [...bodyMeasurements]
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .find((m) => m.weightKg != null || m.bodyFatPct != null) ?? null
+    : null;
+
+  const nutritionBlock = `=== NUTRITION & BODY COMPOSITION (IN SCOPE — answer fuelling questions directly) ===
+
+Effective athlete weight: ${weight != null ? `${weight} kg` : "(not known)"}
+Latest body log: ${
+    latestMeasurement
+      ? `${latestMeasurement.date}${latestMeasurement.weightKg != null ? ` · ${latestMeasurement.weightKg}kg` : ""}${latestMeasurement.bodyFatPct != null ? ` · ${latestMeasurement.bodyFatPct}% BF` : ""}${latestMeasurement.note ? ` · ${latestMeasurement.note}` : ""}`
+      : "(none logged yet)"
+  }
+Body comp goal (parsed from secondary goals): ${
+    bodyCompGoal
+      ? `${bodyCompGoal.metric} → ${bodyCompGoal.target}${bodyCompGoal.metric === "bodyFat" ? "%" : "kg"}${bodyCompGoal.targetDate ? ` by ${bodyCompGoal.targetDate}` : ""}`
+      : "(none — fuel for performance)"
+  }
+
+Today (${today}) fuelling targets:
+${
+    todaysTargets
+      ? `- kcal: ${todaysTargets.kcal} (${todaysTargets.isHardDay ? "HARD day" : "easy day"}, goal mode: ${todaysTargets.goalMode})
+- protein: ${todaysTargets.proteinG}g  ·  carbs: ${todaysTargets.carbsG}g  ·  fat: ${todaysTargets.fatG}g
+- planned sessions: ${todaysSessions.filter((s) => s.type !== "rest").map((s) => s.title).join(", ") || "rest"}`
+      : "(need weight + plan to compute)"
+  }
+
+Tomorrow fuelling targets:
+${
+    tomorrowsTargets
+      ? `- kcal: ${tomorrowsTargets.kcal} (${tomorrowsTargets.isHardDay ? "HARD day" : "easy day"})
+- protein: ${tomorrowsTargets.proteinG}g  ·  carbs: ${tomorrowsTargets.carbsG}g  ·  fat: ${tomorrowsTargets.fatG}g
+- planned sessions: ${tomorrowsSessions.filter((s) => s.type !== "rest").map((s) => s.title).join(", ") || "rest"}`
+      : "(need weight + plan to compute)"
+  }
+
+Use these numbers when the athlete asks about meals, pre-event carb loading, recovery nutrition, or body composition. Quote the actual gram/kcal figures. Don't refuse the question.`;
+
   const client = new Anthropic({ apiKey });
 
   const encoder = new TextEncoder();
@@ -200,7 +331,10 @@ ${athleteNotes.constraints || "(none specified)"}`
           tools: [NOTE_TOOL, AMEND_PLAN_TOOL],
           system: [
             { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-            { type: "text", text: `${dataBlock}\n\n${raceBlock}\n\n${notesBlock}\n\n${planBlock}` },
+            {
+              type: "text",
+              text: `${dataBlock}\n\n${raceBlock}\n\n${notesBlock}\n\n${planBlock}\n\n${nutritionBlock}`,
+            },
           ],
           messages,
         });

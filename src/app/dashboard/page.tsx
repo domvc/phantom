@@ -185,6 +185,8 @@ export default function DashboardHome() {
               raceGoal={race}
               athleteNotes={user.athleteNotes}
               plan={user.plan}
+              bodyMeasurements={user.bodyMeasurements}
+              effectiveWeightKg={effectiveWeight(user)}
             />
           </div>
 

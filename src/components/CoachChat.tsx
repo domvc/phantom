@@ -9,6 +9,7 @@ import {
   type RaceGoal,
   type AthleteNotes,
   type Plan,
+  type BodyMeasurement,
   type ChatMessage as Msg,
 } from "@/lib/storage";
 type Toast = { id: number; field: string; mode: string; preview: string };
@@ -28,11 +29,15 @@ export default function CoachChat({
   raceGoal,
   athleteNotes,
   plan,
+  bodyMeasurements,
+  effectiveWeightKg,
 }: {
   synced?: SyncedData;
   raceGoal?: RaceGoal;
   athleteNotes?: AthleteNotes;
   plan?: Plan;
+  bodyMeasurements?: BodyMeasurement[];
+  effectiveWeightKg?: number | null;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -161,6 +166,8 @@ export default function CoachChat({
           raceGoal,
           athleteNotes,
           plan,
+          bodyMeasurements,
+          effectiveWeightKg,
         }),
       });
       if (!res.ok || !res.body) {
