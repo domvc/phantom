@@ -6,7 +6,7 @@
  * This helper does the streaming read + client-side parse so callers don't
  * have to duplicate it.
  */
-import { getUserState, type Plan, type UserState } from "./storage";
+import { getUserState, nextPrimaryRace, type Plan, type UserState } from "./storage";
 
 export type GeneratePlanResult =
   | { ok: true; plan: Plan }
@@ -83,8 +83,17 @@ export async function generatePlanFromState(): Promise<GeneratePlanResult> {
     };
   }
 
+  // Resolve the actual primary race the same way the server did. If the
+  // stored raceGoal has rolled past (state stuck), pick the next upcoming
+  // A-race from races[] so the plan envelope reflects what the model
+  // actually built for — not the stale August date.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const upcoming =
+    s.raceGoal.date < todayIso ? nextPrimaryRace(s.races ?? []) : null;
+  const effectiveRace = upcoming ?? s.raceGoal;
+
   const today = new Date();
-  const race = new Date(s.raceGoal.date);
+  const race = new Date(effectiveRace.date);
   const totalWeeks = Math.max(
     1,
     Math.ceil((race.getTime() - today.getTime()) / (7 * 86_400_000))
@@ -93,9 +102,9 @@ export async function generatePlanFromState(): Promise<GeneratePlanResult> {
   const plan: Plan = {
     generated_at: new Date().toISOString(),
     race: {
-      name: s.raceGoal.name,
-      date: s.raceGoal.date,
-      type: s.raceGoal.type,
+      name: effectiveRace.name,
+      date: effectiveRace.date,
+      type: effectiveRace.type,
     },
     total_weeks: parsed.total_weeks ?? totalWeeks,
     phases: parsed.phases ?? [],

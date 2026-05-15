@@ -968,6 +968,10 @@ function PlanBanner({
       })
     : null;
 
+  // Default to expanded when regenerating or out-of-date so the user can see
+  // exactly what the plan covers (and what's about to change).
+  const [expanded, setExpanded] = useState(false);
+
   if (!plan) {
     return (
       <div className="bg-accent-soft border border-accent-mid rounded-md p-4 sm:p-5 mb-5 flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
@@ -1012,17 +1016,28 @@ function PlanBanner({
   const weeksDiverged =
     liveWeeksToRace !== null && totalWeeks !== undefined && Math.abs(liveWeeksToRace - totalWeeks) > 1;
   const isStale = dateDiverged || weeksDiverged;
+  const isGenerating = state === "generating";
+  const showDetails = expanded || isGenerating || isStale;
 
   const containerClass = isStale
-    ? "relative bg-accent-soft border border-accent-mid rounded-md p-4 mb-5 overflow-hidden"
-    : "relative bg-surface border border-border-soft rounded-md p-4 mb-5 overflow-hidden";
+    ? "relative bg-accent-soft border border-accent-mid rounded-md p-4 sm:p-5 mb-5 overflow-hidden"
+    : "relative bg-surface border border-border-soft rounded-md p-4 sm:p-5 mb-5 overflow-hidden";
   const buttonClass = isStale
-    ? "px-3 py-1.5 bg-accent hover:bg-accent-h text-white text-[11.5px] font-semibold rounded-md transition whitespace-nowrap shadow-sm"
-    : "px-3 py-1.5 border border-border hover:border-accent hover:text-accent disabled:opacity-50 text-text-mid text-[11.5px] font-semibold rounded-md transition whitespace-nowrap";
+    ? "px-3 py-2 sm:py-1.5 bg-accent hover:bg-accent-h text-white text-[12px] sm:text-[11.5px] font-semibold rounded-md transition whitespace-nowrap shadow-sm"
+    : "px-3 py-2 sm:py-1.5 border border-border hover:border-accent hover:text-accent disabled:opacity-50 text-text-mid text-[12px] sm:text-[11.5px] font-semibold rounded-md transition whitespace-nowrap";
+
+  // Primary race anchor for the header line — prefer the live race goal so
+  // the user sees "anchored to 18 Oct" even when the plan was built for an
+  // older date and is being regenerated right now.
+  const headerRace = isStale ? user.raceGoal : plan.race;
+  const headerWeeksToGo =
+    headerRace?.date != null
+      ? weeksToGo(headerRace.date)
+      : null;
 
   return (
     <div className={containerClass}>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.12em] text-text-muted font-semibold mb-0.5">
             Your training plan
@@ -1030,38 +1045,71 @@ function PlanBanner({
               <span className="ml-2 text-accent">· OUT OF DATE</span>
             )}
           </div>
-          <div className="text-[13px] font-bold tracking-tight text-text">
+          <div className="text-[13.5px] font-bold tracking-tight text-text">
             {totalWeeks} weeks · {phasesCount} phases · {milestonesCount} milestones
           </div>
-          {generated && !isStale && (
-            <div className="text-[10.5px] text-text-muted mt-0.5">
-              {state === "generating" ? "Regenerating…" : `Generated ${generated}`}
+          {headerRace?.name && headerWeeksToGo != null && (
+            <div className="text-[11.5px] text-text-mid mt-0.5">
+              Anchored to{" "}
+              <strong className="text-text font-semibold">
+                {headerRace.name}
+              </strong>{" "}
+              · {formatRaceDate(headerRace.date)}{" "}
+              <span className="text-text-muted">
+                ({headerWeeksToGo === 0 ? "race week" : `${headerWeeksToGo}w to go`})
+              </span>
             </div>
           )}
-          {isStale && state !== "generating" && (
-            <div className="text-[11px] text-accent mt-1 font-medium leading-relaxed">
+          {generated && !isStale && !isGenerating && (
+            <div className="text-[10.5px] text-text-muted mt-0.5">
+              Generated {generated}
+            </div>
+          )}
+          {isStale && !isGenerating && (
+            <div className="text-[11px] text-accent mt-1.5 font-medium leading-relaxed">
               {dateDiverged
-                ? `Race date changed to ${formatRaceDate(liveRaceDate!)} — plan was built for ${formatRaceDate(planRaceDate!)}.`
+                ? `Race date moved to ${formatRaceDate(liveRaceDate!)} — plan was built for ${formatRaceDate(planRaceDate!)}.`
                 : `Plan covers ${totalWeeks} weeks but race is ${liveWeeksToRace} weeks away.`}{" "}
               Regenerate to refresh the phases.
             </div>
           )}
-          {state === "generating" && (
-            <div className="text-[10.5px] text-text-muted mt-0.5">Regenerating…</div>
+          {isGenerating && (
+            <div className="text-[11px] text-accent mt-1 font-medium">
+              Regenerating phases, milestones, and weekly templates… this takes ~30 seconds.
+            </div>
           )}
         </div>
-        <button
-          onClick={onGenerate}
-          disabled={state === "generating"}
-          className={`w-full sm:w-auto ${buttonClass}`}
-        >
-          {state === "generating" ? "Regenerating…" : "Regenerate"}
-        </button>
+        <div className="flex flex-col sm:flex-col gap-1.5 sm:items-end flex-shrink-0">
+          <button
+            onClick={onGenerate}
+            disabled={isGenerating}
+            className={`w-full sm:w-auto ${buttonClass}`}
+          >
+            {isGenerating ? "Regenerating…" : "Regenerate"}
+          </button>
+          {!isGenerating && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="text-[10.5px] text-text-muted hover:text-accent font-semibold transition"
+            >
+              {expanded ? "Hide details ▴" : "Show details ▾"}
+            </button>
+          )}
+        </div>
       </div>
       {error && <div className="text-[12px] text-modify font-medium mt-2">{error}</div>}
 
+      {showDetails && (
+        <PlanBannerDetails
+          plan={plan}
+          races={user.races}
+          isGenerating={isGenerating}
+        />
+      )}
+
       {/* Bold animated progress bar pinned to the bottom of the banner during regeneration */}
-      {state === "generating" && (
+      {isGenerating && (
         <div className="absolute left-0 right-0 bottom-0 h-1 bg-accent-soft overflow-hidden">
           <div className="absolute inset-y-0 left-0 w-1/3 bg-accent rounded-r-full animate-plan-progress" />
         </div>
@@ -1079,6 +1127,200 @@ function PlanBanner({
       `}</style>
     </div>
   );
+}
+
+function PlanBannerDetails({
+  plan,
+  races,
+  isGenerating,
+}: {
+  plan: NonNullable<UserState["plan"]>;
+  races: UserState["races"];
+  isGenerating: boolean;
+}) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const sortedRaces = (races ?? [])
+    .filter((r) => r.date && r.date >= todayIso)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const sortedPhases = [...(plan.phases ?? [])].sort((a, b) =>
+    a.start_date.localeCompare(b.start_date)
+  );
+  const sortedMilestones = [...(plan.milestones ?? [])].sort((a, b) =>
+    a.date.localeCompare(b.date)
+  );
+
+  return (
+    <div
+      className={`mt-4 pt-4 border-t border-border-soft grid gap-4 sm:grid-cols-3 ${
+        isGenerating ? "opacity-60" : ""
+      }`}
+    >
+      {/* Races */}
+      <DetailColumn
+        title={`Races (${sortedRaces.length})`}
+        empty="No upcoming races set."
+      >
+        {sortedRaces.map((r) => {
+          const weeks = weeksToGo(r.date);
+          const pri = r.priority ?? "A";
+          return (
+            <div key={r.id ?? r.date} className="flex items-baseline gap-2">
+              <span
+                className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                  pri === "A"
+                    ? "bg-accent text-white"
+                    : pri === "B"
+                      ? "bg-accent-soft text-accent border border-accent-mid"
+                      : "bg-surface-2 text-text-mid border border-border"
+                }`}
+              >
+                {pri}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] font-semibold text-text truncate">
+                  {r.name}
+                </div>
+                <div className="text-[10.5px] text-text-muted">
+                  {formatRaceDate(r.date)}
+                  {" · "}
+                  {weeks === 0 ? "race week" : `${weeks}w to go`}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </DetailColumn>
+
+      {/* Phases */}
+      <DetailColumn
+        title={`Phases (${sortedPhases.length})`}
+        empty="No phases yet."
+      >
+        {sortedPhases.map((p, i) => {
+          const isActive = todayIso >= p.start_date && todayIso <= p.end_date;
+          const phaseWeeks =
+            (p.weeks_to_end ?? 0) - (p.weeks_from_start ?? 0) + 1;
+          return (
+            <div
+              key={`${p.name}-${i}`}
+              className={`${isActive ? "border-l-2 border-accent pl-2 -ml-0.5" : ""}`}
+            >
+              <div className="flex items-baseline gap-2">
+                <span
+                  className={`text-[12px] font-semibold ${
+                    isActive ? "text-accent" : "text-text"
+                  }`}
+                >
+                  {p.name}
+                </span>
+                <span className="text-[10px] text-text-muted">{phaseWeeks}w</span>
+                {isActive && (
+                  <span className="text-[8.5px] uppercase tracking-wider text-accent font-bold">
+                    Now
+                  </span>
+                )}
+              </div>
+              <div className="text-[10.5px] text-text-muted">
+                {formatPhaseRange(p.start_date, p.end_date)}
+                {p.focus ? ` · ${p.focus}` : ""}
+              </div>
+            </div>
+          );
+        })}
+      </DetailColumn>
+
+      {/* Milestones */}
+      <DetailColumn
+        title={`Milestones (${sortedMilestones.length})`}
+        empty="No milestones yet."
+      >
+        {sortedMilestones.slice(0, 8).map((m, i) => {
+          const isPast = m.date < todayIso;
+          const isToday = m.date === todayIso;
+          const weeks = weeksToGo(m.date);
+          return (
+            <div key={`${m.date}-${i}`} className="flex items-baseline gap-2">
+              <span
+                className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                  m.type === "race"
+                    ? "bg-accent text-white"
+                    : isPast
+                      ? "bg-go-soft text-go"
+                      : isToday
+                        ? "bg-accent text-white"
+                        : "bg-surface-2 text-text-muted border border-border"
+                }`}
+              >
+                {m.type === "race" ? "RACE" : m.type === "test" ? "TEST" : m.type === "phase_end" ? "PHASE" : m.type.toUpperCase().slice(0, 5)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] font-semibold text-text truncate">
+                  {m.title}
+                </div>
+                <div className="text-[10.5px] text-text-muted">
+                  {formatRaceDate(m.date)}
+                  {!isPast && ` · ${weeks === 0 ? "today" : `${weeks}w to go`}`}
+                  {isPast && " · done"}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {sortedMilestones.length > 8 && (
+          <div className="text-[10px] text-text-muted">
+            + {sortedMilestones.length - 8} more
+          </div>
+        )}
+      </DetailColumn>
+    </div>
+  );
+}
+
+function DetailColumn({
+  title,
+  empty,
+  children,
+}: {
+  title: string;
+  empty: string;
+  children: React.ReactNode;
+}) {
+  const hasChildren = Array.isArray(children)
+    ? children.some((c) => c !== null && c !== undefined && c !== false)
+    : Boolean(children);
+  return (
+    <div className="min-w-0">
+      <div className="text-[9.5px] uppercase tracking-[0.12em] font-bold text-text-muted mb-2">
+        {title}
+      </div>
+      <div className="space-y-2">
+        {hasChildren ? (
+          children
+        ) : (
+          <div className="text-[11px] text-text-muted italic">{empty}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function weeksToGo(iso: string): number {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return 0;
+  return Math.ceil(ms / (7 * 86_400_000));
+}
+
+function formatPhaseRange(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const fmt = (d: Date, withYear: boolean) =>
+    d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      ...(withYear ? { year: "numeric" } : {}),
+    });
+  return `${fmt(start, false)} → ${fmt(end, !sameYear)}`;
 }
 
 function formatRaceDate(iso: string): string {

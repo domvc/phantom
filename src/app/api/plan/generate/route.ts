@@ -93,18 +93,9 @@ export async function POST(req: NextRequest) {
   }
 
   const today = new Date();
-  const race = new Date(raceGoal.date);
-  const totalDays = Math.ceil((race.getTime() - today.getTime()) / 86400000);
-  const totalWeeks = Math.max(1, Math.ceil(totalDays / 7));
+  const todayIso = today.toISOString().slice(0, 10);
 
-  if (totalDays < 7) {
-    return NextResponse.json(
-      { ok: false, error: "Race is less than a week away — no plan to generate" },
-      { status: 400 }
-    );
-  }
-
-  // races[] is the source of truth, but back-compat: build it from raceGoal if absent
+  // races[] is the source of truth, but back-compat: build it from raceGoal if absent.
   type IncomingRace = {
     id?: string;
     name: string;
@@ -117,11 +108,45 @@ export async function POST(req: NextRequest) {
   const races: IncomingRace[] = Array.isArray(racesIn) && racesIn.length > 0
     ? racesIn
     : [{ ...raceGoal, priority: "A" as const }];
-  const todayIso = today.toISOString().slice(0, 10);
+
   const upcomingRaces = races
     .filter((r) => r.date && r.date >= todayIso)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const secondaryRaces = upcomingRaces.filter((r) => r.date !== raceGoal.date);
+
+  // SAFETY NET: if the incoming raceGoal is in the past (state can get stuck
+  // when an A-race rolls past without the user updating their goal), promote
+  // the next upcoming A-race so we don't try to generate a plan for a date
+  // that's already happened.
+  let primaryRace = raceGoal;
+  if (raceGoal.date < todayIso) {
+    const nextA =
+      upcomingRaces.find((r) => (r.priority ?? "A") === "A") ?? upcomingRaces[0];
+    if (nextA) {
+      primaryRace = { ...raceGoal, ...nextA };
+    } else {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Your primary race date is in the past and no upcoming races are set. Update your race goal in Settings, then try again.",
+        },
+        { status: 400 }
+      );
+    }
+  }
+
+  const race = new Date(primaryRace.date);
+  const totalDays = Math.ceil((race.getTime() - today.getTime()) / 86400000);
+  const totalWeeks = Math.max(1, Math.ceil(totalDays / 7));
+
+  if (totalDays < 7) {
+    return NextResponse.json(
+      { ok: false, error: "Race is less than a week away — no plan to generate" },
+      { status: 400 }
+    );
+  }
+
+  const secondaryRaces = upcomingRaces.filter((r) => r.date !== primaryRace.date);
 
   const userPrompt = `Generate the training plan now.
 
@@ -129,9 +154,9 @@ TODAY: ${todayIso}
 WEEKS TO PRIMARY A-RACE: ${totalWeeks}
 
 PRIMARY A-RACE (the plan anchors here):
-${JSON.stringify(raceGoal, null, 2)}
+${JSON.stringify(primaryRace, null, 2)}
 ${
-  raceGoal.type === "Ultra"
+  primaryRace.type === "Ultra"
     ? `
 ULTRA-SPECIFIC GUIDANCE:
 - Ultras are NOT marathons stretched out. Time-on-feet beats top-end intensity.
@@ -246,7 +271,15 @@ Output JSON now.`;
         const stream = client.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 12000,
-          system: PLAN_SYSTEM,
+          // Cache the system prompt — it's the same on every regen for the
+          // life of the app. Saves ~500 input tokens and ~150ms per retry.
+          system: [
+            {
+              type: "text",
+              text: PLAN_SYSTEM,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
           messages: [{ role: "user", content: userPrompt }],
         });
 
