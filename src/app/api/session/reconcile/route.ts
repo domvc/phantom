@@ -17,9 +17,9 @@ Output VALID JSON ONLY — no prose, no markdown:
 }
 
 Status definitions:
-- aligned: same sport AND duration/load within ~25% of plan target
+- aligned: same sport AND duration/load within ~25% of plan target — OR the athlete flagged this exact change with the main coach in recent chat (treat as intentional, downgrade nothing)
 - swapped: different sport OR markedly different session shape, but load is in the right ballpark (e.g. did a Z2 ride instead of an easy run)
-- deviation: skipped most of the planned load, OR went meaningfully harder/longer than planned (≥40% over)
+- deviation: skipped most of the planned load, OR went meaningfully harder/longer than planned (≥40% over) — unless the recent chat shows the athlete announced this intent (then 'aligned' with a note)
 - extra: nothing was planned that day — this is bonus activity
 
 Voice (load-bearing):
@@ -27,6 +27,7 @@ Voice (load-bearing):
 - Hard nouns. Use minutes, watts, sport names. No "great job" / "well done" / wellness fluff.
 - Cause-effect when relevant. "Z2 bike trades for Z2 run — same aerobic stimulus, hits the easy-day brief."
 - Never moralise. The athlete chose; we adapt.
+- If the recent chat shows the athlete flagged this session intent ahead of time, surface that ("100km ride matches what you flagged with the coach yesterday — load logged as planned"), don't treat it as a surprise.
 
 Examples:
 - aligned: "60min Z2 ride, exactly the easy aerobic stimulus today asked for."
@@ -46,7 +47,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { activity, plannedSessions, phase } = body;
+  const { activity, plannedSessions, phase, recentChat } = body as {
+    activity?: unknown;
+    plannedSessions?: unknown[];
+    phase?: unknown;
+    recentChat?: { role: "user" | "assistant"; content: string }[];
+  };
 
   if (!activity) {
     return new Response(JSON.stringify({ error: "No activity provided" }), {
@@ -69,6 +75,15 @@ ${
 
 CURRENT PHASE:
 ${phase ? JSON.stringify(phase, null, 2) : "(no phase context)"}
+
+RECENT CHAT WITH THE MAIN COACH (the athlete may have flagged intent here — use to disambiguate whether a deviation is intentional):
+${
+  Array.isArray(recentChat) && recentChat.length > 0
+    ? recentChat
+        .map((m) => `${m.role === "user" ? "Athlete" : "Coach"}: ${m.content}`)
+        .join("\n---\n")
+    : "(no recent chat)"
+}
 
 Output the JSON now.`;
 

@@ -76,7 +76,12 @@ export default function SessionFeedbackModal({
     setAnalysisError(null);
     setLoadingAnalysis(true);
 
-    const recentFeedback = (getUserState().sessionFeedbacks || []).slice(-5);
+    const userState = getUserState();
+    const recentFeedback = (userState.sessionFeedbacks || []).slice(-5);
+    // Recent main-coach chat history. Lets the analyser/feedback coach see
+    // anything the athlete already told the main coach (e.g. "I'm doing a
+    // 100km ride today") so it doesn't act surprised at the same activity.
+    const recentChat = (userState.chatHistory || []).slice(-12);
 
     (async () => {
       try {
@@ -90,6 +95,7 @@ export default function SessionFeedbackModal({
             synced,
             athleteNotes,
             recentFeedback,
+            recentChat,
           }),
           signal: ctrl.signal,
         });
@@ -183,6 +189,7 @@ export default function SessionFeedbackModal({
     setStreamingHtml("");
 
     try {
+      const recentChat = (getUserState().chatHistory || []).slice(-12);
       const res = await fetch("/api/chat/session-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -194,6 +201,7 @@ export default function SessionFeedbackModal({
           synced,
           athleteNotes,
           raceGoal,
+          recentChat,
         }),
       });
       if (!res.ok || !res.body) {

@@ -72,6 +72,7 @@ async function classifyActivity(opts: {
   activity: RecentActivity;
   plannedSessions: PlannedSession[];
   phase: PlanPhase | null;
+  recentChat?: { role: "user" | "assistant"; content: string }[];
 }): Promise<ReconcileResult | null> {
   try {
     const res = await fetch("/api/session/reconcile", {
@@ -145,6 +146,12 @@ export async function runReconciliationsAfterSync(maxBatch = 3): Promise<Reconci
   const skipped = fresh.length - batch.length;
   const newOnes: SessionReconciliation[] = [];
 
+  // Shared across the batch — the most recent main-coach chat. If the athlete
+  // told the main coach they were doing a one-off session ("100km ride today",
+  // "swapping Tue and Wed this week"), the reconciler should respect that and
+  // not flag it as a deviation.
+  const recentChat = (state.chatHistory ?? []).slice(-12);
+
   for (const activity of batch) {
     const dateIso = activity.date.slice(0, 10);
     const planned = plannedSessionsForDate(state.plan, dateIso);
@@ -155,6 +162,7 @@ export async function runReconciliationsAfterSync(maxBatch = 3): Promise<Reconci
       activity,
       plannedSessions: planned,
       phase,
+      recentChat,
     });
 
     if (!result) continue;

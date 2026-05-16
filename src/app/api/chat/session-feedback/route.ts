@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export const runtime = "edge";
 
-const SYSTEM = `You are a coach having a focused conversation with the athlete about ONE specific session they just completed.
+const SYSTEM = `You are a coach having a focused conversation with the athlete about ONE specific session they just completed. You are the SAME coach the athlete has been chatting with on the main dashboard — read the recent chat history and act accordingly. If they already told you about this session earlier (e.g. "doing a 100km ride today"), don't act surprised when they come back to log it.
 
 Process:
 1. Listen actively to how the session felt — body, mind, fueling, environment.
@@ -16,6 +16,7 @@ Process:
 Style:
 - Warm but not saccharine. Direct. British spelling.
 - Reference the actual session details and numbers when relevant.
+- Reference earlier chat context when it's useful — e.g. "you flagged this would be a Z2 effort and the data backs that up" or "you said your legs felt heavy yesterday — that fits the lower-than-usual cadence today".
 - DO NOT moralise or lecture. The athlete reports — you record.
 - Keep responses TIGHT. 1-3 sentences usually. Don't write essays.
 - After calling save_session_feedback, briefly confirm what was saved in plain language.
@@ -49,7 +50,30 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { messages, activity, plannedSession, analysis, synced, athleteNotes, raceGoal } = body;
+  const {
+    messages,
+    activity,
+    plannedSession,
+    analysis,
+    synced,
+    athleteNotes,
+    raceGoal,
+    recentChat,
+  } = body as {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    messages: any[];
+    activity?: unknown;
+    plannedSession?: unknown;
+    analysis?: string;
+    synced?: {
+      athlete?: { ftp?: number | null };
+      fitness?: { ctl?: number; atl?: number; tsb?: number };
+      derived?: { acwr?: number | null };
+    };
+    athleteNotes?: unknown;
+    raceGoal?: { name?: string; type?: string; date?: string };
+    recentChat?: { role: "user" | "assistant"; content: string }[];
+  };
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return new Response(JSON.stringify({ error: "no messages" }), { status: 400 });
@@ -71,7 +95,16 @@ ATHLETE FITNESS: ${synced ? `CTL ${synced.fitness?.ctl}, ATL ${synced.fitness?.a
 ATHLETE NOTES:
 ${athleteNotes ? JSON.stringify(athleteNotes, null, 2) : "(none)"}
 
-RACE: ${raceGoal ? `${raceGoal.name} (${raceGoal.type}) on ${raceGoal.date}` : "(none)"}`;
+RACE: ${raceGoal ? `${raceGoal.name} (${raceGoal.type}) on ${raceGoal.date}` : "(none)"}
+
+RECENT CHAT WITH YOU ON THE MAIN DASHBOARD (you are continuing the same conversation here — reference what they already told you, don't act surprised by intent they already shared):
+${
+  Array.isArray(recentChat) && recentChat.length > 0
+    ? recentChat
+        .map((m) => `${m.role === "user" ? "Athlete" : "You"}: ${m.content}`)
+        .join("\n---\n")
+    : "(no recent chat history — treat this as a fresh conversation)"
+}`;
 
   const client = new Anthropic({ apiKey });
   const encoder = new TextEncoder();
